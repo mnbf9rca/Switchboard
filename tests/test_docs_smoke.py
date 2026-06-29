@@ -42,6 +42,7 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
     text = _guide_text()
 
     assert "python -m agent_comm --version" in text
+    assert "python scripts/build_codex_plugin.py" in text
     assert "command -v agent-comm >/dev/null && agent-comm --version" in text
     assert "BUS_DIR=$(mktemp -d)" in text
     assert "chmod 700 \"$BUS_DIR\"" in text

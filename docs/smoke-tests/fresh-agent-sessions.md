@@ -14,6 +14,7 @@ chmod 700 "$BUS_DIR"
 BUS="$BUS_DIR/bus.sqlite"
 cd "$ROOT"
 
+python scripts/build_codex_plugin.py
 python -m agent_comm --version
 command -v agent-comm >/dev/null && agent-comm --version
 
@@ -41,8 +42,9 @@ In Codex, use `/plugins`, add that marketplace source, then install
 session after installing so the skills are loaded.
 
 The marketplace file lives at `.agents/plugins/marketplace.json`, and its
-plugin source points at the repository root so the installed plugin includes
-the skills, `.codex-plugin/plugin.json`, `scripts/agent-comm`, and `agent_comm`.
+plugin source points at the generated `plugins/agents-together` bundle. Re-run
+`python scripts/build_codex_plugin.py` and reinstall the plugin after source
+changes so Codex picks up a new cachebusted plugin version.
 
 Expose the local Claude plugin from:
 

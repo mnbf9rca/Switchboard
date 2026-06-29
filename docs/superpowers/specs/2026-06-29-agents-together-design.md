@@ -274,6 +274,13 @@ Runtime command resolution:
 5. In a development checkout only, use `uv run agent-comm`.
 6. If none work, stop with setup instructions.
 
+Codex plugin packaging:
+
+- The source tree owns the runtime package, skills, launcher, and manifests.
+- `scripts/build_codex_plugin.py` creates the ignored local bundle at `plugins/agents-together`.
+- The repo marketplace points at that generated bundle, not at the whole repository.
+- Rebuild and reinstall the Codex plugin after source changes so Codex gets a cachebusted plugin version.
+
 Commands:
 
 ```text

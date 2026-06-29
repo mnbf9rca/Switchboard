@@ -17,6 +17,8 @@ build/
 dist/
 *.egg-info/
 
+plugins/agents-together/
+
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

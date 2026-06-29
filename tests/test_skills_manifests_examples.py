@@ -5,6 +5,7 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import sys
 
 from scripts.validate_skill_protocols import validate_skill_protocols
 
@@ -157,8 +158,7 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
 
     codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
     assert codex["name"] == claude_expected["name"]
-    assert codex["version"].startswith(f"{claude_expected['version']}+codex.")
-    assert re.fullmatch(r"0\.1\.0\+codex\.[0-9a-z-]+", codex["version"])
+    assert codex["version"] == claude_expected["version"]
     assert codex["description"] == claude_expected["description"]
     assert codex["skills"] == claude_expected["skills"]
     assert isinstance(codex["author"], dict)
@@ -189,7 +189,7 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
                 "name": "agents-together",
                 "source": {
                     "source": "local",
-                    "path": "./",
+                    "path": "./plugins/agents-together",
                 },
                 "policy": {
                     "installation": "AVAILABLE",
@@ -200,17 +200,8 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
         ],
     }
 
-
     assert (ROOT / ".codex-plugin" / "plugin.json").is_file()
     assert (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").is_file()
-
-
-def test_plugin_has_single_source_layout_without_nested_copies():
-    nested_plugin_root = ROOT / "plugins" / "agents-together"
-
-    assert not (nested_plugin_root / "agent_comm").exists()
-    assert not (nested_plugin_root / "skills").exists()
-    assert not (nested_plugin_root / ".codex-plugin").exists()
 
 
 def test_plugin_launcher_runs_from_outside_repo(tmp_path):
@@ -257,6 +248,67 @@ def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
     assert result.stdout == ""
     assert "requires Python 3.12 or newer" in result.stderr
     assert "unsupported python should not run agent_comm" not in result.stderr
+
+
+def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
+    output = tmp_path / "agents-together"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "build_codex_plugin.py"),
+            "--output",
+            str(output),
+            "--cachebuster",
+            "test-123",
+        ],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert "Built Codex plugin" in result.stdout
+    manifest = json.loads((output / ".codex-plugin" / "plugin.json").read_text())
+    assert manifest["version"] == "0.1.0+codex.test-123"
+
+    expected_files = [
+        ".codex-plugin/plugin.json",
+        ".generated.json",
+        "README.md",
+        "agent_comm/__main__.py",
+        "agent_comm/cli.py",
+        "scripts/agent-comm",
+        "skills/coordinate-as-planner/SKILL.md",
+        "skills/coordinate-as-planner/references/agent-communication-protocol.md",
+        "skills/coordinate-as-implementer/SKILL.md",
+    ]
+    for relative_path in expected_files:
+        assert (output / relative_path).is_file()
+
+    for forbidden in (
+        ".git",
+        ".venv",
+        ".pytest_cache",
+        "dist",
+        "tests",
+        "handover.md",
+        "plugins",
+        "uv.lock",
+    ):
+        assert not (output / forbidden).exists()
+
+    launcher = output / "scripts" / "agent-comm"
+    assert os.access(launcher, os.X_OK)
+    version = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=tmp_path,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert version.stdout.strip() == "agent-comm 0.1.0"
 
 
 def test_examples_exist_as_markdown_message_bodies():
