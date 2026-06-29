@@ -304,7 +304,8 @@ def _derive_title(body: str) -> str:
 
 def _handle_inbox(args: argparse.Namespace) -> int:
     try:
-        messages = _repo_create(args).inbox(_agent_arg(args))
+        agent = _agent_arg(args)
+        messages = _repo_create(args).inbox(agent)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     _print_messages(messages, include_body=False)
@@ -325,7 +326,8 @@ def _handle_show(args: argparse.Namespace) -> int:
 
 def _handle_ack(args: argparse.Namespace) -> int:
     try:
-        message = _repo_create(args).ack_message(args.message, _agent_arg(args))
+        agent = _agent_arg(args)
+        message = _repo_create(args).ack_message(args.message, agent)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     print(f"message: {message.id}")
@@ -338,10 +340,11 @@ def _handle_wait(args: argparse.Namespace) -> int:
         print("ERROR: --timeout must be non-negative", file=sys.stderr)
         return 1
     try:
+        agent = _agent_arg(args)
         repo = _repo_create(args)
         messages = _wait_for_messages(
             repo,
-            _agent_arg(args),
+            agent,
             timeout=args.timeout,
             follow=args.follow,
         )

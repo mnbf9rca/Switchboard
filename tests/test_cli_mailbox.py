@@ -898,6 +898,23 @@ def test_high_level_read_commands_auto_initialize_empty_bus(run_cli, tmp_path):
     assert "does not exist" not in ack.stderr
 
 
+def test_read_commands_require_identity_before_creating_bus(run_cli, tmp_path):
+    cases = [
+        ("inbox",),
+        ("ack", "msg_missing"),
+        ("wait", "--timeout", "0"),
+    ]
+
+    for index, args in enumerate(cases):
+        missing_bus = tmp_path / f"missing-{index}.sqlite"
+
+        result = run_cli("--bus", str(missing_bus), *args)
+
+        assert result.returncode != 0
+        assert "--as or --agent is required" in result.stderr
+        assert not missing_bus.exists()
+
+
 def test_send_and_next_share_default_bus_across_worktrees(
     make_git_repo, tmp_path, monkeypatch, cli_env
 ):
