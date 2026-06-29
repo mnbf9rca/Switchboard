@@ -41,7 +41,7 @@ def open_bus(
     return db
 
 
-def initialize_bus(path: str | os.PathLike[str], project_id: str) -> sqlite3.Connection:
+def initialize_bus(path: str | os.PathLike[str]) -> sqlite3.Connection:
     db = open_bus(path)
     try:
         version = _schema_version(db)

@@ -26,7 +26,7 @@ def temp_bus(tmp_path: Path) -> Path:
 def bus(temp_bus: Path) -> Path:
     from switchboard.db import initialize_bus
 
-    with initialize_bus(temp_bus, "demo"):
+    with initialize_bus(temp_bus):
         pass
     return temp_bus
 

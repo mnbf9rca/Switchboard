@@ -166,8 +166,7 @@ def _handle_placeholder(args: argparse.Namespace) -> int:
 def _handle_init(args: argparse.Namespace) -> int:
     try:
         path = resolve_bus_path(args.bus, args.project, cwd=None)
-        project_id = args.project or path.parent.name
-        with initialize_bus(path, project_id):
+        with initialize_bus(path):
             pass
     except (BusResolutionError, BusError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -489,8 +488,7 @@ def _repo_read(args: argparse.Namespace) -> Repository:
 
 def _repo_create(args: argparse.Namespace) -> Repository:
     path = _bus_path(args)
-    project_id = path.parent.name
-    with initialize_bus(path, project_id):
+    with initialize_bus(path):
         pass
     return Repository(path)
 

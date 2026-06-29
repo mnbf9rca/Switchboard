@@ -143,7 +143,7 @@ def test_global_project_before_init_is_preserved(monkeypatch):
             return False
 
     monkeypatch.setattr(cli, "resolve_bus_path", fake_resolve_bus_path)
-    monkeypatch.setattr(cli, "initialize_bus", lambda path, project_id: FakeConnection())
+    monkeypatch.setattr(cli, "initialize_bus", lambda path: FakeConnection())
 
     result = cli.main(["--project", "demo", "init"])
 
