@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import OLD_ACTIVE_NAMES
+
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDE = ROOT / "docs" / "smoke-tests" / "fresh-agent-sessions.md"
@@ -22,9 +24,8 @@ def test_fresh_agent_smoke_guide_documents_local_installs():
     normalized = " ".join(text.lower().split())
 
     assert ".agents/plugins" in text
-    assert "/Users/rob/Downloads/git/agents-together" in text
     assert "/plugins" in text
-    assert "agents-together-local" in text
+    assert "switchboard-local" in text
     assert ".claude-plugin/plugin.json" in text
     assert "Claude" in text
     assert "local skills-directory installs may use a different claude namespace" in normalized
@@ -33,22 +34,23 @@ def test_fresh_agent_smoke_guide_documents_local_installs():
 def test_fresh_agent_smoke_guide_uses_exact_skill_invocations():
     text = _guide_text()
 
-    assert "/agents-together:coordinate-as-planner" in text
-    assert "/agents-together:coordinate-as-implementer" in text
+    assert "/switchboard:coordinate-as-planner" in text
+    assert "/switchboard:coordinate-as-implementer" in text
 
 
 def test_fresh_agent_smoke_guide_documents_runtime_commands():
     text = _guide_text()
 
-    assert "python3.12 -m agent_comm --version" in text
-    assert "python -m agent_comm --version" not in text
+    assert "python3.12 -m switchboard --version" in text
+    assert "python -m switchboard --version" not in text
+    assert "python3.12 -m agent_comm --version" not in text
     assert "python scripts/build_codex_plugin.py" in text
-    assert "command -v agent-comm >/dev/null && agent-comm --version" in text
+    assert "command -v switchboard >/dev/null && switchboard --version" in text
     assert "BUS_DIR=$(mktemp -d)" in text
     assert "chmod 700 \"$BUS_DIR\"" in text
     assert "BUS=\"$BUS_DIR/bus.sqlite\"" in text
     assert "printf 'BUS=%s\\n' \"$BUS\"" in text
-    assert "<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>" in text
+    assert "<installed plugin root>/scripts/switchboard --bus <BUS printed by setup>" in text
 
 
 def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
@@ -63,26 +65,28 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
         "MSG_IMPLEMENTER_TO_PLANNER=\"<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>\"",
         "replace pasted bus and planner values before running",
         "replace pasted bus, planner, and implementer values before running",
-        'agent-comm --bus "$BUS" next --as implementer-feature-a',
-        'agent-comm --bus "$BUS" inbox --as planner-main',
+        'switchboard --bus "$BUS" next --as implementer-feature-a',
+        'switchboard --bus "$BUS" inbox --as planner-main',
     )
     for snippet in required_snippets:
         assert snippet in text
 
     compact = " ".join(text.replace("\\\n", " ").split())
     assert (
-        'agent-comm --bus "$BUS" send --as planner-main --to implementer-feature-a '
+        'switchboard --bus "$BUS" send --as planner-main --to implementer-feature-a '
         '--title "Fresh session smoke"'
     ) in compact
     assert (
-        'agent-comm --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" '
+        'switchboard --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" '
         '--as implementer-feature-a'
     ) in compact
 
     forbidden_snippets = (
+        *OLD_ACTIVE_NAMES,
         "THREAD_ID",
         "register",
         "start-thread",
+        " post ",
         "run_agent_comm",
         "artifact add",
         "status --thread",
@@ -93,7 +97,7 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
     for snippet in forbidden_snippets:
         assert snippet not in text
 
-    assert 'agent-comm --bus "$BUS" post' not in text
+    assert 'switchboard --bus "$BUS" post' not in text
 
 
 def test_fresh_agent_smoke_flow_commands_round_trip(tmp_path):
@@ -101,7 +105,7 @@ def test_fresh_agent_smoke_flow_commands_round_trip(tmp_path):
 
     def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [sys.executable, "-m", "agent_comm", *args],
+            [sys.executable, "-m", "switchboard", *args],
             cwd=ROOT,
             text=True,
             capture_output=True,

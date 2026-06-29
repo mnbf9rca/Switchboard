@@ -5,8 +5,8 @@ import sqlite3
 
 import pytest
 
-from agent_comm import repository
-from agent_comm.repository import Repository
+from switchboard import repository
+from switchboard.repository import Repository
 
 
 def test_register_upserts_agent_and_last_seen(bus):

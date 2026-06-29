@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from agent_comm.paths import (
+from switchboard.paths import (
     canonical_origin,
     project_key,
     resolve_bus_path,
@@ -10,21 +10,31 @@ from agent_comm.paths import (
 
 
 def test_explicit_bus_wins_over_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_COMM_BUS", str(tmp_path / "env.sqlite"))
+    monkeypatch.setenv("SWITCHBOARD_BUS", str(tmp_path / "env.sqlite"))
     path = resolve_bus_path(bus=tmp_path / "explicit.sqlite", project=None, cwd=tmp_path)
     assert path.name == "explicit.sqlite"
 
 
 def test_env_bus_wins_over_project(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_COMM_BUS", str(tmp_path / "env.sqlite"))
+    monkeypatch.setenv("SWITCHBOARD_BUS", str(tmp_path / "env.sqlite"))
     path = resolve_bus_path(bus=None, project="demo", cwd=tmp_path)
     assert path.name == "env.sqlite"
+
+
+def test_old_agent_comm_env_var_is_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("AGENT_COMM_BUS", str(tmp_path / "old-env.sqlite"))
+
+    path = resolve_bus_path(bus=None, project="demo", cwd=tmp_path)
+
+    assert path != tmp_path / "old-env.sqlite"
+    assert path.parent.parent == tmp_path / "home" / ".switchboard" / "projects"
 
 
 def test_project_uses_default_state_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     path = resolve_bus_path(bus=None, project="Example Project", cwd=tmp_path)
-    assert path.parent.parent == tmp_path / ".agent-comm" / "projects"
+    assert path.parent.parent == tmp_path / ".switchboard" / "projects"
     assert path.parent.name.startswith("example-project-")
     assert len(path.parent.name.rsplit("-", 1)[-1]) == 12
     assert path.name == "bus.sqlite"
@@ -70,7 +80,7 @@ def test_missing_project_outside_git_uses_absolute_cwd(tmp_path, monkeypatch):
 
     path = resolve_bus_path(bus=None, project=None, cwd=workdir)
 
-    assert path.parent.parent == home / ".agent-comm" / "projects"
+    assert path.parent.parent == home / ".switchboard" / "projects"
     assert path.parent.name.startswith("plain-project-")
     assert len(path.parent.name.rsplit("-", 1)[-1]) == 12
     assert path.name == "bus.sqlite"
@@ -133,9 +143,9 @@ def test_git_unavailable_uses_absolute_cwd(tmp_path, monkeypatch):
     def raise_missing_git(*_args, **_kwargs):
         raise FileNotFoundError("git")
 
-    monkeypatch.setattr("agent_comm.paths.subprocess.run", raise_missing_git)
+    monkeypatch.setattr("switchboard.paths.subprocess.run", raise_missing_git)
 
     path = resolve_bus_path(bus=None, project=None, cwd=tmp_path)
 
-    assert path.parent.parent == tmp_path / "home" / ".agent-comm" / "projects"
+    assert path.parent.parent == tmp_path / "home" / ".switchboard" / "projects"
     assert path.name == "bus.sqlite"

@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+from conftest import OLD_ACTIVE_NAMES
 from scripts.validate_skill_protocols import validate_skill_protocols
 
 
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 SKILLS = {
     "coordinate-as-planner": {
-        "description": "Coordinate as the planning agent using agent-comm. Use when preparing implementation handoffs, sending deliberate messages to implementers, answering implementation questions, reviewing ready work, or accepting completed work through a durable local agent mailbox.",
+        "description": "Coordinate as the planning agent using Switchboard. Use when preparing implementation handoffs, sending deliberate messages to implementers, answering implementation questions, reviewing ready work, or accepting completed work through a durable local agent mailbox.",
         "triggers": [
             "preparing implementation handoffs",
             "sending deliberate messages",
@@ -25,7 +26,7 @@ SKILLS = {
         ],
     },
     "coordinate-as-implementer": {
-        "description": "Coordinate as the implementation agent using agent-comm. Use when receiving planner handoffs, reading durable agent messages, acknowledging work, asking implementation questions, reporting blockers, or signaling ready-for-review work through a local mailbox.",
+        "description": "Coordinate as the implementation agent using Switchboard. Use when receiving planner handoffs, reading durable agent messages, acknowledging work, asking implementation questions, reporting blockers, or signaling ready-for-review work through a local mailbox.",
         "triggers": [
             "receiving planner handoffs",
             "reading durable agent messages",
@@ -90,17 +91,17 @@ def test_skills_have_required_frontmatter_and_trigger_rich_descriptions():
         assert frontmatter["description"] == expected["description"]
         for trigger in expected["triggers"]:
             assert trigger in frontmatter["description"]
-        assert "agent-comm --version" in body
-        assert "python3.12 -m agent_comm --version" in body
-        assert "py -3.12 -m agent_comm --version" in body
-        assert "uv run agent-comm --version" in body
-        assert "python3 -m agent_comm --version" not in body
-        assert "python -m agent_comm --version" not in body
+        assert "switchboard --version" in body
+        assert "python3.12 -m switchboard --version" in body
+        assert "py -3.12 -m switchboard --version" in body
+        assert "uv run switchboard --version" in body
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in body
 
 
 def test_each_skill_has_protocol_reference_and_validator_confirms_duplication():
     paths = [
-        ROOT / "skills" / skill_name / "references" / "agent-communication-protocol.md"
+        ROOT / "skills" / skill_name / "references" / "switchboard-protocol.md"
         for skill_name in SKILLS
     ]
     for path in paths:
@@ -115,7 +116,7 @@ def test_protocol_guides_agent_communication_not_cli_help():
         / "skills"
         / "coordinate-as-planner"
         / "references"
-        / "agent-communication-protocol.md"
+        / "switchboard-protocol.md"
     ).read_text()
 
     for section in (
@@ -147,30 +148,37 @@ def test_protocol_guides_agent_communication_not_cli_help():
         assert guidance in protocol
 
     for guidance in (
-        "agent-comm send --as",
-        "agent-comm reply <message-id> --as",
-        "agent-comm next --as",
+        "switchboard send --as",
+        "switchboard reply <message-id> --as",
+        "switchboard next --as",
         "Use ack explicitly when you read without replying",
     ):
         assert guidance in protocol
 
     command_appendix = protocol.split("## Minimal Command Appendix", 1)[1]
     before_appendix = protocol.split("## Minimal Command Appendix", 1)[0]
-    assert before_appendix.count("agent-comm ") == 0
-    assert command_appendix.count("agent-comm ") <= 14
+    assert before_appendix.count("switchboard ") == 0
+    assert command_appendix.count("switchboard ") <= 14
 
     for old_command in (
-        "agent-comm register",
-        "agent-comm start-thread",
-        "agent-comm post",
+        *OLD_ACTIVE_NAMES,
+        "switchboard register",
+        "switchboard start-thread",
+        "switchboard post",
         "--body-file <path>",
     ):
         assert old_command not in command_appendix
+
+    for old_name in OLD_ACTIVE_NAMES:
+        assert old_name not in protocol
 
     planner_skill = (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").read_text()
     implementer_skill = (
         ROOT / "skills" / "coordinate-as-implementer" / "SKILL.md"
     ).read_text()
+    for skill_text in (planner_skill, implementer_skill):
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in skill_text
 
     for required in (
         "Do not inspect CLI help before using the normal workflow",
@@ -189,16 +197,16 @@ def test_protocol_guides_agent_communication_not_cli_help():
 
     for required in (
         "reply automatically acknowledges",
-        "Use `agent-comm ack --as",
+        "Use `switchboard ack --as",
     ):
         assert required in implementer_skill
 
 
 def test_plugin_manifests_expose_skills_as_harness_adapters():
     claude_expected = {
-        "name": "agents-together",
-        "version": "0.1.1",
-        "description": "Durable local coordination workflows for independent coding agents",
+        "name": "switchboard",
+        "version": "0.2.0",
+        "description": "A local mailbox for deliberate agent coordination",
         "skills": "./skills/",
     }
     assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text()) == claude_expected
@@ -227,16 +235,16 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
     marketplace = json.loads((marketplace_root / "marketplace.json").read_text())
 
     assert marketplace == {
-        "name": "agents-together-local",
+        "name": "switchboard-local",
         "interface": {
-            "displayName": "Agents Together Local",
+            "displayName": "Switchboard Local",
         },
         "plugins": [
             {
-                "name": "agents-together",
+                "name": "switchboard",
                 "source": {
                     "source": "local",
-                    "path": "./plugins/agents-together",
+                    "path": "./plugins/switchboard",
                 },
                 "policy": {
                     "installation": "AVAILABLE",
@@ -252,7 +260,7 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
 
 
 def test_plugin_launcher_runs_from_outside_repo(tmp_path):
-    launcher = ROOT / "scripts" / "agent-comm"
+    launcher = ROOT / "scripts" / "switchboard"
 
     assert launcher.is_file()
     assert os.access(launcher, os.X_OK)
@@ -266,11 +274,11 @@ def test_plugin_launcher_runs_from_outside_repo(tmp_path):
         stderr=subprocess.PIPE,
     )
 
-    assert result.stdout.strip() == "agent-comm 0.1.1"
+    assert result.stdout.strip() == "switchboard 0.2.0"
 
 
 def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
-    launcher = ROOT / "scripts" / "agent-comm"
+    launcher = ROOT / "scripts" / "switchboard"
     fake_python = tmp_path / "python"
     fake_python.write_text(
         "#!/usr/bin/env sh\n"
@@ -298,7 +306,7 @@ def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
 
 
 def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
-    output = tmp_path / "agents-together"
+    output = tmp_path / "switchboard"
     result = subprocess.run(
         [
             sys.executable,
@@ -317,18 +325,19 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
 
     assert "Built Codex plugin" in result.stdout
     manifest = json.loads((output / ".codex-plugin" / "plugin.json").read_text())
-    assert manifest["version"] == "0.1.1+codex.test-123"
+    assert manifest["version"] == "0.2.0+codex.test-123"
 
     expected_files = [
         ".codex-plugin/plugin.json",
         ".generated.json",
         "README.md",
-        "agent_comm/__main__.py",
-        "agent_comm/cli.py",
-        "scripts/agent-comm",
+        "switchboard/__main__.py",
+        "switchboard/cli.py",
+        "scripts/switchboard",
         "skills/coordinate-as-planner/SKILL.md",
-        "skills/coordinate-as-planner/references/agent-communication-protocol.md",
+        "skills/coordinate-as-planner/references/switchboard-protocol.md",
         "skills/coordinate-as-implementer/SKILL.md",
+        "skills/coordinate-as-implementer/references/switchboard-protocol.md",
     ]
     for relative_path in expected_files:
         assert (output / relative_path).is_file()
@@ -345,7 +354,7 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
     ):
         assert not (output / forbidden).exists()
 
-    launcher = output / "scripts" / "agent-comm"
+    launcher = output / "scripts" / "switchboard"
     assert os.access(launcher, os.X_OK)
     version = subprocess.run(
         [str(launcher), "--version"],
@@ -355,7 +364,7 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    assert version.stdout.strip() == "agent-comm 0.1.1"
+    assert version.stdout.strip() == "switchboard 0.2.0"
 
 
 def test_examples_exist_as_markdown_message_bodies():
@@ -363,7 +372,8 @@ def test_examples_exist_as_markdown_message_bodies():
         path = ROOT / "examples" / name
         text = path.read_text()
         assert text.startswith("# ")
-        assert "agent-comm" not in text.lower() or "```" not in text
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in text
         for pattern in EXAMPLE_HEADER_PATTERNS:
             assert pattern not in text
 

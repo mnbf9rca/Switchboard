@@ -7,7 +7,7 @@ import stat
 
 import pytest
 
-from agent_comm import cli
+from switchboard import cli
 
 
 def test_init_creates_schema_version_one_and_tables(run_cli, temp_bus):

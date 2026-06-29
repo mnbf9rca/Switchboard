@@ -7,7 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from agent_comm.db import initialize_bus
+
+OLD_ACTIVE_NAMES = (
+    "agent-comm",
+    "agent_comm",
+    "agents-together",
+    "Agents Together",
+    "agent-communication-protocol.md",
+)
 
 
 @pytest.fixture
@@ -17,6 +24,8 @@ def temp_bus(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bus(temp_bus: Path) -> Path:
+    from switchboard.db import initialize_bus
+
     with initialize_bus(temp_bus, "demo"):
         pass
     return temp_bus
@@ -57,7 +66,7 @@ def cli_env() -> dict[str, str]:
 @pytest.fixture
 def run_cli(tmp_path: Path, cli_env: dict[str, str]):
     def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
-        script = _agent_comm_script(Path(sys.executable))
+        script = _switchboard_script(Path(sys.executable))
         return subprocess.run(
             [str(script), *args],
             cwd=tmp_path,
@@ -70,10 +79,10 @@ def run_cli(tmp_path: Path, cli_env: dict[str, str]):
     return _run_cli
 
 
-def _agent_comm_script(python_executable: Path) -> Path:
-    script = python_executable.with_name("agent-comm")
+def _switchboard_script(python_executable: Path) -> Path:
+    script = python_executable.with_name("switchboard")
     if not script.exists():
-        raise RuntimeError(f"agent-comm console script is missing: {script}")
+        raise RuntimeError(f"switchboard console script is missing: {script}")
     return script
 
 
@@ -81,7 +90,7 @@ def _agent_comm_script(python_executable: Path) -> Path:
 def run_module_cli(tmp_path: Path, cli_env: dict[str, str]):
     def _run_module_cli(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [sys.executable, "-m", "agent_comm", *args],
+            [sys.executable, "-m", "switchboard", *args],
             cwd=tmp_path,
             env=cli_env,
             text=True,

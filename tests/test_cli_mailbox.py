@@ -6,8 +6,8 @@ import sys
 import time
 from pathlib import Path
 
-from conftest import _agent_comm_script
-from agent_comm.paths import resolve_bus_path
+from conftest import _switchboard_script
+from switchboard.paths import resolve_bus_path
 
 
 def test_register_start_thread_and_post_round_trip(run_cli, temp_bus, tmp_path):
@@ -288,7 +288,7 @@ def test_wait_follow_polls_until_message_arrives(run_cli, temp_bus, tmp_path):
 
     wait_process = subprocess.Popen(
         [
-            str(_agent_comm_script(Path(sys.executable))),
+            str(_switchboard_script(Path(sys.executable))),
             "--bus",
             str(temp_bus),
             "wait",
@@ -515,7 +515,7 @@ def test_send_supports_body_file_stdin_artifacts_and_in_thread(
     assert artifact["message_id"] == first_message_id
     assert artifact["path"] == str(artifact_path)
 
-    script = _agent_comm_script(Path(sys.executable))
+    script = _switchboard_script(Path(sys.executable))
     second = subprocess.run(
         [
             str(script),
@@ -564,7 +564,7 @@ def test_send_uses_derived_default_bus_without_project_or_bus(
 ):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     repo = make_git_repo("repo", origin="git@github.com:Example/Repo.git")
-    script = _agent_comm_script(Path(sys.executable))
+    script = _switchboard_script(Path(sys.executable))
 
     result = subprocess.run(
         [
@@ -921,7 +921,7 @@ def test_read_commands_require_identity_before_creating_bus(run_cli, tmp_path):
 
 
 def test_sqlite_operational_errors_do_not_show_tracebacks(monkeypatch, capsys):
-    from agent_comm import cli
+    from switchboard import cli
 
     def raise_readonly(_args):
         raise sqlite3.OperationalError("attempt to write a readonly database")
@@ -942,7 +942,7 @@ def test_send_and_next_share_default_bus_across_worktrees(
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     repo_a = make_git_repo("repo-a", origin="git@github.com:Example/Repo.git")
     repo_b = make_git_repo("repo-b", origin="https://github.com/example/repo.git")
-    script = _agent_comm_script(Path(sys.executable))
+    script = _switchboard_script(Path(sys.executable))
     env = {**cli_env, "HOME": str(tmp_path / "home")}
 
     send = subprocess.run(

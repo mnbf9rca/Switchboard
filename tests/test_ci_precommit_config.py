@@ -51,8 +51,8 @@ def test_protocol_validator_cli_prints_compared_paths():
 
     assert result.returncode == 0, result.stderr
     assert "Validated 2 skill protocol references:" in result.stdout
-    assert "skills/coordinate-as-planner/references/agent-communication-protocol.md" in result.stdout
-    assert "skills/coordinate-as-implementer/references/agent-communication-protocol.md" in result.stdout
+    assert "skills/coordinate-as-planner/references/switchboard-protocol.md" in result.stdout
+    assert "skills/coordinate-as-implementer/references/switchboard-protocol.md" in result.stdout
 
 
 def test_protocol_validator_cli_reports_byte_mismatches(tmp_path):
@@ -60,7 +60,7 @@ def test_protocol_validator_cli_reports_byte_mismatches(tmp_path):
     second = tmp_path / "skills" / "two" / "references"
     first.mkdir(parents=True)
     second.mkdir(parents=True)
-    protocol = "agent-communication-protocol.md"
+    protocol = "switchboard-protocol.md"
     (first / protocol).write_bytes(b"same text\n")
     (second / protocol).write_bytes(b"same text\r\n")
 
