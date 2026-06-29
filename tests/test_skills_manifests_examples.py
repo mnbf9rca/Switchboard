@@ -101,6 +101,48 @@ def test_each_skill_has_protocol_reference_and_validator_confirms_duplication():
     validate_skill_protocols(ROOT)
 
 
+def test_protocol_guides_agent_communication_not_cli_help():
+    protocol = (
+        ROOT
+        / "skills"
+        / "coordinate-as-planner"
+        / "references"
+        / "agent-communication-protocol.md"
+    ).read_text()
+
+    for section in (
+        "## Communication Principles",
+        "## What To Include",
+        "## Planner Behavior",
+        "## Implementer Behavior",
+        "## Threads, Replies, and Artifacts",
+        "## Waiting and Monitoring",
+        "## Conflict Handling",
+        "## Minimal Command Appendix",
+    ):
+        assert section in protocol
+
+    for guidance in (
+        "Send a mailbox message when another agent must act",
+        "Do not send routine progress updates",
+        "Every message should be addressed, intentional, and useful on its own",
+        "The requested action or decision.",
+        "Avoid ceremony and rigid headers",
+        "Create or update project artifacts before messaging",
+        "read your inbox before starting work",
+        "Acknowledge only after reading",
+        "Use one thread for one coherent stream of work or review",
+        "Use wait or follow only when you are actually blocked",
+        "Do not invent precedence rules in the tool layer",
+    ):
+        assert guidance in protocol
+
+    command_appendix = protocol.split("## Minimal Command Appendix", 1)[1]
+    before_appendix = protocol.split("## Minimal Command Appendix", 1)[0]
+    assert before_appendix.count("agent-comm ") == 0
+    assert command_appendix.count("agent-comm ") <= 14
+
+
 def test_plugin_manifests_expose_skills_as_harness_adapters():
     claude_expected = {
         "name": "agents-together",

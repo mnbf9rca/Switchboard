@@ -1,109 +1,76 @@
 # Agent Communication Protocol
 
-`agent-comm` provides a durable local mailbox for independent coding agents. It stores addressed messages, thread relationships, acknowledgements, and artifact links in a project-local bus. It does not require a background daemon.
+`agent-comm` is a durable mailbox for deliberate coordination between independent agents. It is not a progress log, memory system, task tracker, or workflow engine. Use it to cross an agent boundary: one agent needs another agent to read, decide, answer, review, or accept something.
 
-## Roles and IDs
+## Communication Principles
 
-Planner and implementer are coordination roles, not fixed identities. Any agent can use any agent ID that makes sense for the current collaboration. Keep IDs stable within a task so inboxes and replies remain easy to follow.
+Send a mailbox message when another agent must act on information that is not already obvious from the repository state or current user instruction. Good reasons include a new handoff, a focused implementation question, a blocker that needs a decision, work that is ready for review, review findings that need action, acceptance of completed work, or a clarification request when instructions conflict.
 
-## Deliberate Messages
+Do not send routine progress updates, private scratch notes, command transcripts, or large working context through the mailbox. Keep those in project artifacts such as plans, review notes, logs, diffs, or handover files, then link the artifact from the message. The mailbox message should say why the artifact matters and what response is expected.
 
-Use addressed messages for intentional coordination. A useful message body states the requested action, current context, constraints, artifact links, and the expected response. Keep messages concise and link to project files for large plans, logs, diffs, or review notes.
+Every message should be addressed, intentional, and useful on its own. A reader should be able to understand who needs to do what, why now, where the durable context lives, and what kind of reply closes the loop.
 
-Use threads to group related handoffs, questions, blockers, review notes, and acceptance messages. Continue a conversation by replying to the relevant prior message with repeated `--reply-to` use so the thread remains durable and navigable.
+## What To Include
 
-## Command Reference
+Use short Markdown bodies. Prefer this shape when it fits:
 
-Use the command form discovered by the skill, replacing `agent-comm` with the working module invocation when needed.
+- The requested action or decision.
+- The context needed to make that action safe.
+- Links or paths to project artifacts.
+- Constraints that matter now.
+- The expected reply, such as answer, acknowledgement, review result, blocker detail, or acceptance.
 
-Initialize or inspect the bus:
+Avoid ceremony and rigid headers. The body still has to be read, so write it like a clear note to a specific collaborator rather than a form for a parser.
+
+## Planner Behavior
+
+As planner, use messages to hand work to implementers, answer their questions, redirect blocked work, request review follow-up, and accept or reject ready work. Create or update project artifacts before messaging when the work needs durable detail. The mailbox message should point at those artifacts and state the immediate action.
+
+Before sending new instructions, read your inbox so you do not overwrite a question, blocker, or ready-for-review reply. When reviewing implementation output, read the linked artifacts and repository state before acknowledging or accepting the message.
+
+If you discover new information that changes the task, send a deliberate message to the affected agent. Do not rely on the other agent noticing chat history or unrelated file changes.
+
+## Implementer Behavior
+
+As implementer, read your inbox before starting work and at meaningful boundaries. Show and read the full message before acknowledging it. Acknowledge only after reading the message body and linked artifacts.
+
+Ask a question when you cannot proceed safely from the handoff and repository artifacts. Report a blocker when you tried the expected path and need a decision or intervention. Send ready-for-review only when the requested work is in the repository and the verification evidence is available in a linked artifact or concise message body.
+
+Replies should stay in the same thread and point back to the message being answered. If you answer several prior messages at once, link each relevant prior message as a reply target.
+
+## Threads, Replies, and Artifacts
+
+Use one thread for one coherent stream of work or review. Keep handoffs, questions, blockers, review findings, and acceptance for that stream in the same thread. Start a new thread when the work is unrelated or when mixing it into the existing thread would make the history harder to follow.
+
+Use reply links to show which message you are answering. Reply links are not workflow state; they are durable conversation structure.
+
+Use artifact links for project-native files that carry the real context: plans, specs, patches, test logs, review notes, screenshots, handover notes, and acceptance notes. Prefer artifact links over pasted bulk content. Do not paste secrets, credentials, private tokens, or large proprietary logs into mailbox messages.
+
+## Waiting and Monitoring
+
+Check inboxes at the start of work, before changing direction, before final reporting, and after asking another agent for a decision. Use wait or follow only when you are actually blocked on the next mailbox message. Agents may build their own lightweight monitor around the inbox, but the protocol does not require a daemon.
+
+## Conflict Handling
+
+If mailbox messages, repository artifacts, and current user direction disagree, stop and ask for clarification. Send a message to the relevant agent or agents that states the conflict, cites the conflicting messages or artifact paths, and asks for the ordering or intent needed to proceed. Do not invent precedence rules in the tool layer.
+
+## Minimal Command Appendix
+
+Use the command form discovered by the skill. Replace `agent-comm` with `python -m agent_comm` when that is the working runtime.
 
 ```sh
 agent-comm init --project <project-id>
+agent-comm register --agent <agent-id> --role <role> --harness <harness>
+agent-comm start-thread --project <project-id> --title "<title>"
+agent-comm post --thread <thread-id> --from <sender> --to <recipient> --subject "<subject>" --body-file <path>
+agent-comm post --thread <thread-id> --from <sender> --to <recipient> --subject "<subject>" --body-file <path> --reply-to <message-id>
+agent-comm inbox --agent <agent-id>
+agent-comm show <message-id>
+agent-comm ack <message-id> --agent <agent-id>
+agent-comm wait --agent <agent-id>
+agent-comm wait --agent <agent-id> --follow
+agent-comm artifact add --thread <thread-id> --message <message-id> --path <project-relative-path> --description "<why this matters>"
 agent-comm doctor
 agent-comm backup --out <path>
 agent-comm restore --from <path>
 ```
-
-Register an agent identity:
-
-```sh
-agent-comm register --agent <agent-id> --role <role> --harness <harness>
-```
-
-Start a thread:
-
-```sh
-agent-comm start-thread --project <project-id> --title "<title>"
-```
-
-Send a message body from a Markdown file:
-
-```sh
-agent-comm post \
-  --thread <thread-id> \
-  --from <sender-agent-id> \
-  --to <recipient-agent-id> \
-  --subject "<subject>" \
-  --body-file <path>
-```
-
-Reply to one or more prior messages in the same thread:
-
-```sh
-agent-comm post \
-  --thread <thread-id> \
-  --from <sender-agent-id> \
-  --to <recipient-agent-id> \
-  --subject "<subject>" \
-  --body-file <path> \
-  --reply-to <message-id> \
-  --reply-to <message-id>
-```
-
-Read and acknowledge messages:
-
-```sh
-agent-comm inbox --agent <agent-id>
-agent-comm show <message-id>
-agent-comm ack <message-id> --agent <agent-id>
-```
-
-Wait for messages when useful:
-
-```sh
-agent-comm wait --agent <agent-id>
-agent-comm wait --agent <agent-id> --follow
-agent-comm wait --agent <agent-id> -f
-```
-
-Link a project artifact:
-
-```sh
-agent-comm artifact add \
-  --thread <thread-id> \
-  --message <message-id> \
-  --path <project-relative-path> \
-  --git-ref <git-ref> \
-  --description "<why this matters>"
-```
-
-## Inbox, Show, Ack, and Wait
-
-Check inboxes at the start of work, at meaningful boundaries, and before final coordination. Use inbox output to identify messages that need attention.
-
-Use show to read the full message before acting. Acknowledge only after reading the body and any linked artifacts. Use wait when coordination depends on another agent's next message and polling would be wasteful.
-
-## Replies and Artifacts
-
-Reply in the same thread when asking questions, reporting blockers, handing back work, or reviewing results. Add artifacts for project-native files that carry durable context, such as plans, patches, test logs, screenshots, review notes, and acceptance notes.
-
-Prefer artifact links over pasted bulk content. Do not paste secrets, credentials, private tokens, or large proprietary logs into mailbox messages.
-
-## Backup and Doctor
-
-Use backup before risky maintenance or when preserving a bus snapshot matters. Use doctor when setup, path resolution, database access, or mailbox behavior appears wrong. Doctor output is diagnostic context; keep the coordination decision in the message thread.
-
-## Conflict Handling
-
-If mailbox messages, repository artifacts, and current user direction disagree, stop and ask for clarification. State the conflict directly, link the relevant artifacts or messages, and wait for a clear decision before continuing.
