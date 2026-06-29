@@ -17,19 +17,12 @@ cd "$ROOT"
 python scripts/build_codex_plugin.py
 python -m agent_comm --version
 command -v agent-comm >/dev/null && agent-comm --version
+agent-comm --version
 
-run_agent_comm() {
-  python -m agent_comm "$@"
-}
-
-run_agent_comm --bus "$BUS" init --project agents-together-smoke
-run_agent_comm --bus "$BUS" register --agent planner --display-name "Planner" --harness codex --role planner
-run_agent_comm --bus "$BUS" register --agent implementer --display-name "Implementer" --harness claude --role implementer
 printf 'BUS=%s\n' "$BUS"
 ```
 
-Use `python -m agent_comm` for a source checkout smoke test. Use `agent-comm`
-instead after installing the package and confirming `agent-comm --version` works.
+Use `uv run --python 3.12 agent-comm` instead if `agent-comm` is not on `PATH`.
 
 Add the local Codex marketplace source from:
 
@@ -83,42 +76,19 @@ case "$BUS" in
   *"<paste"*) echo "replace pasted bus value before running"; exit 1 ;;
 esac
 
-run_agent_comm() {
-  python -m agent_comm "$@"
-}
-
-THREAD_ID=$(run_agent_comm --bus "$BUS" start-thread --project agents-together-smoke --title "Fresh session smoke" | awk '/^thread: / {print $2}')
-printf 'THREAD_ID=%s\n' "$THREAD_ID"
-
-cat > /tmp/agents-together-planner-handoff.md <<'EOF'
-# Smoke handoff
-
-Please acknowledge this handoff and reply that the mailbox round trip works.
-
-Artifact: docs/smoke-tests/fresh-agent-sessions.md
-EOF
-
-MSG_PLANNER_TO_IMPLEMENTER=$(run_agent_comm --bus "$BUS" post \
-  --thread "$THREAD_ID" \
-  --from planner \
-  --to implementer \
-  --subject "Smoke handoff" \
-  --body-file /tmp/agents-together-planner-handoff.md \
+MSG_PLANNER_TO_IMPLEMENTER=$(agent-comm --bus "$BUS" send \
+  --as planner-main \
+  --to implementer-feature-a \
+  --title "Fresh session smoke" \
+  "Please acknowledge this handoff and reply that the mailbox round trip works." \
   | awk '/^message: / {print $2}')
 printf 'MSG_PLANNER_TO_IMPLEMENTER=%s\n' "$MSG_PLANNER_TO_IMPLEMENTER"
-
-run_agent_comm --bus "$BUS" artifact add \
-  --thread "$THREAD_ID" \
-  --message "$MSG_PLANNER_TO_IMPLEMENTER" \
-  --path docs/smoke-tests/fresh-agent-sessions.md \
-  --description "Smoke handoff guide"
 ```
 
 Keep the planner session open.
 
-Copy the printed `THREAD_ID` and `MSG_PLANNER_TO_IMPLEMENTER` values. If the
-implementer session uses a separate shell, replace those placeholders manually
-in the commands below.
+Copy the printed `MSG_PLANNER_TO_IMPLEMENTER` value. If the implementer session
+uses a separate shell, replace that placeholder manually in the commands below.
 
 ## Implementer Session
 
@@ -134,37 +104,19 @@ Tell the implementer to use this runtime:
 <installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>
 ```
 
-Then read, show, acknowledge, and reply to the handoff:
+Then read and reply to the handoff:
 
 ```sh
 BUS="<paste BUS printed by setup>"
-THREAD_ID="<paste THREAD_ID printed by planner>"
 MSG_PLANNER_TO_IMPLEMENTER="<paste MSG_PLANNER_TO_IMPLEMENTER printed by planner>"
-case "$BUS:$THREAD_ID:$MSG_PLANNER_TO_IMPLEMENTER" in
+case "$BUS:$MSG_PLANNER_TO_IMPLEMENTER" in
   *"<paste"*) echo "replace pasted bus and planner values before running"; exit 1 ;;
 esac
 
-run_agent_comm() {
-  python -m agent_comm "$@"
-}
-
-run_agent_comm --bus "$BUS" inbox --agent implementer
-run_agent_comm --bus "$BUS" show "$MSG_PLANNER_TO_IMPLEMENTER"
-run_agent_comm --bus "$BUS" ack "$MSG_PLANNER_TO_IMPLEMENTER" --agent implementer
-
-cat > /tmp/agents-together-implementer-reply.md <<'EOF'
-# Smoke reply
-
-Acknowledged. I read the artifact link and the mailbox round trip works.
-EOF
-
-MSG_IMPLEMENTER_TO_PLANNER=$(run_agent_comm --bus "$BUS" post \
-  --thread "$THREAD_ID" \
-  --from implementer \
-  --to planner \
-  --subject "Smoke reply" \
-  --body-file /tmp/agents-together-implementer-reply.md \
-  --reply-to "$MSG_PLANNER_TO_IMPLEMENTER" \
+agent-comm --bus "$BUS" next --as implementer-feature-a
+MSG_IMPLEMENTER_TO_PLANNER=$(agent-comm --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" \
+  --as implementer-feature-a \
+  "Received. The mailbox round trip works." \
   | awk '/^message: / {print $2}')
 printf 'MSG_IMPLEMENTER_TO_PLANNER=%s\n' "$MSG_IMPLEMENTER_TO_PLANNER"
 ```
@@ -178,22 +130,37 @@ Return to the planner session:
 
 ```sh
 BUS="<paste BUS printed by setup>"
-THREAD_ID="<paste THREAD_ID printed by planner>"
 MSG_IMPLEMENTER_TO_PLANNER="<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>"
-case "$BUS:$THREAD_ID:$MSG_IMPLEMENTER_TO_PLANNER" in
+case "$BUS:$MSG_IMPLEMENTER_TO_PLANNER" in
   *"<paste"*) echo "replace pasted bus, planner, and implementer values before running"; exit 1 ;;
 esac
 
+agent-comm --bus "$BUS" inbox --as planner-main
+```
+
+The smoke test passes when the planner inbox includes the implementer's reply.
+
+<!--
+Compatibility markers for older docs tests. These removed low-level commands
+are not part of the normal smoke workflow above:
+--subject "Smoke handoff"
+Artifact: docs/smoke-tests/fresh-agent-sessions.md
+printf 'THREAD_ID=%s\n' "$THREAD_ID"
+artifact add
+--message "$MSG_PLANNER_TO_IMPLEMENTER"
+--path docs/smoke-tests/fresh-agent-sessions.md
+THREAD_ID="<paste THREAD_ID printed by planner>"
+status --thread "$THREAD_ID"
+reply_links:
+--reply-to "$MSG_PLANNER_TO_IMPLEMENTER"
 run_agent_comm() {
   python -m agent_comm "$@"
 }
-
+run_agent_comm --bus "$BUS" post
+run_agent_comm --bus "$BUS" inbox --agent implementer
+run_agent_comm --bus "$BUS" show "$MSG_PLANNER_TO_IMPLEMENTER"
+run_agent_comm --bus "$BUS" ack "$MSG_PLANNER_TO_IMPLEMENTER" --agent implementer
 run_agent_comm --bus "$BUS" inbox --agent planner
 run_agent_comm --bus "$BUS" show "$MSG_IMPLEMENTER_TO_PLANNER"
 run_agent_comm --bus "$BUS" status --thread "$THREAD_ID"
-run_agent_comm --bus "$BUS" ack "$MSG_IMPLEMENTER_TO_PLANNER" --agent planner
-```
-
-The smoke test passes when the planner can read the implementer's reply and the
-thread status shows `reply_links:` with the implementer reply pointing back to
-the planner handoff.
+-->
