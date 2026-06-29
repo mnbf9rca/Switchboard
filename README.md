@@ -16,6 +16,7 @@ python -m agent_comm --help
 Development invocation uses `uv` only as a developer convenience:
 
 ```sh
+uv run --python 3.12 python --version
 uv run pytest
 uv run agent-comm --help
 ```

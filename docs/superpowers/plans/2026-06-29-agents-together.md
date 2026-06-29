@@ -6,6 +6,8 @@
 
 **Tech Stack:** Python 3.12+, stdlib `argparse`, stdlib `sqlite3`, stdlib `hashlib`, stdlib `pathlib`, pytest, `uv` for development only. Runtime commands must work as `agent-comm ...` and `python -m agent_comm ...`.
 
+Development verification is pinned to Python 3.12 with `.python-version` and `uv run --python 3.12 ...`. Runtime remains Python 3.12+.
+
 ---
 
 ## Non-Negotiable Scope
@@ -25,6 +27,7 @@ Do not add:
 ## File Structure
 
 - Create `pyproject.toml`: package metadata, Python floor, console script, pytest config.
+- Create `.python-version`: pin local uv development to Python 3.12.
 - Create `README.md`: mailbox purpose, install/runtime commands, development commands, safety notes.
 - Create `agent_comm/__init__.py`: package version.
 - Create `agent_comm/__main__.py`: `python -m agent_comm` entry point.
@@ -57,6 +60,7 @@ Do not add:
 **Files:**
 
 - Create: `pyproject.toml`
+- Create: `.python-version`
 - Create: `README.md`
 - Create: `agent_comm/__init__.py`
 - Create: `agent_comm/__main__.py`
@@ -91,13 +95,13 @@ Expected: FAIL because `agent_comm` does not exist.
 
 - [ ] **Step 2: GREEN - minimal package**
 
-Add package metadata with `requires-python = ">=3.12"`, console script `agent-comm = "agent_comm.cli:main"`, pytest config, `agent_comm.__version__ = "0.1.0"`, and an argparse skeleton with all MVP command names visible in help:
+Add `.python-version` containing `3.12`, package metadata with `requires-python = ">=3.12"`, console script `agent-comm = "agent_comm.cli:main"`, pytest config, `agent_comm.__version__ = "0.1.0"`, and an argparse skeleton with all MVP command names visible in help:
 
 ```text
 init doctor backup restore register start-thread post inbox show ack wait artifact status export migrate
 ```
 
-Document runtime invocation as `agent-comm`, `python3 -m agent_comm`, and `python -m agent_comm`; document `uv run ...` only for development.
+Document runtime invocation as `agent-comm`, `python3 -m agent_comm`, and `python -m agent_comm`; document `uv run --python 3.12 ...` only for development.
 
 Run: `uv run pytest tests/test_package_cli.py -v`
 
