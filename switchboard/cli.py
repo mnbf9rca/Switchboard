@@ -740,7 +740,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = _parse_args(parser, argv)
     handler = getattr(args, "handler", None)
     if handler is None:
         parser.print_help()
@@ -749,3 +749,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return handler(args)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
+
+
+def _parse_args(
+    parser: argparse.ArgumentParser,
+    argv: Sequence[str] | None,
+) -> argparse.Namespace:
+    args, unknown = parser.parse_known_args(argv)
+    if not unknown:
+        return args
+    if (
+        getattr(args, "command", None) in {"send", "reply"}
+        and all(not token.startswith("-") for token in unknown)
+    ):
+        args.message.extend(unknown)
+        return args
+    parser.error(f"unrecognized arguments: {' '.join(unknown)}")
