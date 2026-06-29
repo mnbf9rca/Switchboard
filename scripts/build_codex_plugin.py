@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "plugins" / "agents-together"
+DEFAULT_OUTPUT = ROOT / "plugins" / "switchboard"
 
 
 def parse_args() -> argparse.Namespace:
