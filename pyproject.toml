@@ -1,13 +1,13 @@
 [project]
-name = "agent-comm"
-version = "0.1.1"
-description = "Durable local mailbox for independent coding agents"
+name = "switchboard"
+version = "0.2.0"
+description = "A local mailbox for deliberate agent coordination"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-agent-comm = "agent_comm.cli:main"
+switchboard = "switchboard.cli:main"
 
 [build-system]
 requires = ["hatchling"]

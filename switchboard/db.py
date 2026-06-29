@@ -51,7 +51,7 @@ def initialize_bus(path: str | os.PathLike[str], project_id: str) -> sqlite3.Con
             _commit_and_checkpoint(db)
         elif version < SCHEMA_VERSION:
             raise BusError(
-                f"schema version {version} requires migration; run agent-comm migrate"
+                f"schema version {version} requires migration; run switchboard migrate"
             )
         _check_supported_version(db)
     except Exception:

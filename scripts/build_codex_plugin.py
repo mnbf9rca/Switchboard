@@ -42,9 +42,9 @@ def main() -> None:
     output.mkdir(parents=True)
 
     copy_tree(ROOT / ".codex-plugin", output / ".codex-plugin")
-    copy_tree(ROOT / "agent_comm", output / "agent_comm")
+    copy_tree(ROOT / "switchboard", output / "switchboard")
     copy_tree(ROOT / "skills", output / "skills")
-    copy_file(ROOT / "scripts" / "agent-comm", output / "scripts" / "agent-comm")
+    copy_file(ROOT / "scripts" / "switchboard", output / "scripts" / "switchboard")
     copy_file(ROOT / "README.md", output / "README.md")
 
     version = update_manifest_version(
@@ -72,7 +72,7 @@ def copy_tree(source: Path, destination: Path) -> None:
 def copy_file(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
-    if source.name == "agent-comm":
+    if source.name == "switchboard":
         mode = destination.stat().st_mode
         destination.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

@@ -40,7 +40,7 @@ def core_health(path: str | os.PathLike[str]) -> list[str]:
         raise BusError(f"bus is not a valid SQLite database: {bus_path}") from exc
 
     return [
-        "agent-comm doctor: ok",
+        "switchboard doctor: ok",
         "db opens: ok",
         f"schema version: {version}",
         "integrity: ok",

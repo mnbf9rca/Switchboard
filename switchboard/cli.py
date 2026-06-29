@@ -43,13 +43,13 @@ MIN_PYTHON = (3, 12)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="agent-comm",
+        prog="switchboard",
         description="Durable local mailbox for independent coding agents.",
     )
     parser.add_argument(
         "--version",
         action="version",
-        version=f"agent-comm {__version__}",
+        version=f"switchboard {__version__}",
     )
     parser.add_argument("--bus", help=argparse.SUPPRESS)
     parser.add_argument("--project", help=argparse.SUPPRESS)
@@ -172,7 +172,7 @@ def _handle_init(args: argparse.Namespace) -> int:
     except (BusResolutionError, BusError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"Initialized agent-comm bus at {path}")
+    print(f"Initialized switchboard bus at {path}")
     return 0
 
 
@@ -734,7 +734,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         current = ".".join(str(part) for part in sys.version_info[:3])
         required = ".".join(str(part) for part in MIN_PYTHON)
         print(
-            f"ERROR: agent-comm requires Python {required} or newer; "
+            f"ERROR: switchboard requires Python {required} or newer; "
             f"{sys.executable} is Python {current}.",
             file=sys.stderr,
         )

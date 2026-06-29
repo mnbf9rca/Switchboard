@@ -51,7 +51,7 @@ def resolve_bus_path(
     if bus is not None:
         return Path(bus).expanduser()
 
-    env_bus = os.environ.get("AGENT_COMM_BUS")
+    env_bus = os.environ.get("SWITCHBOARD_BUS")
     if env_bus:
         return Path(env_bus).expanduser()
 
@@ -116,13 +116,13 @@ def _git_superproject(cwd: Path) -> str | None:
 
 
 def _default_bus_path(value: str) -> Path:
-    return Path.home() / ".agent-comm" / "projects" / project_key(value) / "bus.sqlite"
+    return Path.home() / ".switchboard" / "projects" / project_key(value) / "bus.sqlite"
 
 
 def _default_derived_bus_path(source: str) -> Path:
     return (
         Path.home()
-        / ".agent-comm"
+        / ".switchboard"
         / "projects"
         / _derived_project_key(source)
         / "bus.sqlite"
