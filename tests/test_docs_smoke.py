@@ -41,7 +41,11 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
 
     assert "python -m agent_comm --version" in text
     assert "command -v agent-comm >/dev/null && agent-comm --version" in text
-    assert "python -m agent_comm --bus /tmp/agents-together-smoke.db" in text
+    assert "BUS_DIR=$(mktemp -d)" in text
+    assert "chmod 700 \"$BUS_DIR\"" in text
+    assert "BUS=\"$BUS_DIR/bus.sqlite\"" in text
+    assert "printf 'BUS=%s\\n' \"$BUS\"" in text
+    assert "python -m agent_comm --bus <BUS printed by setup>" in text
     assert "run_agent_comm() {" in text
 
 
@@ -51,6 +55,8 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
     for snippet in (
         "--subject \"Smoke handoff\"",
         "Artifact: docs/smoke-tests/fresh-agent-sessions.md",
+        "BUS=\"<paste BUS printed by setup>\"",
+        "replace pasted bus value before running",
         "printf 'THREAD_ID=%s\\n' \"$THREAD_ID\"",
         "printf 'MSG_PLANNER_TO_IMPLEMENTER=%s\\n' \"$MSG_PLANNER_TO_IMPLEMENTER\"",
         "printf 'MSG_IMPLEMENTER_TO_PLANNER=%s\\n' \"$MSG_IMPLEMENTER_TO_PLANNER\"",
@@ -60,8 +66,8 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
         "THREAD_ID=\"<paste THREAD_ID printed by planner>\"",
         "MSG_PLANNER_TO_IMPLEMENTER=\"<paste MSG_PLANNER_TO_IMPLEMENTER printed by planner>\"",
         "MSG_IMPLEMENTER_TO_PLANNER=\"<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>\"",
-        "replace pasted planner values before running",
-        "replace pasted planner and implementer values before running",
+        "replace pasted bus and planner values before running",
+        "replace pasted bus, planner, and implementer values before running",
         "status --thread \"$THREAD_ID\"",
         "reply_links:",
         "--reply-to \"$MSG_PLANNER_TO_IMPLEMENTER\"",

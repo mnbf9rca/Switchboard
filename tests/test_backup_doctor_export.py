@@ -49,6 +49,37 @@ def test_backup_does_not_chmod_existing_output_directory(run_cli, temp_bus, tmp_
     assert stat.S_IMODE(output_dir.stat().st_mode) == 0o755
 
 
+def test_backup_and_restore_accept_paths_with_uri_characters(run_cli, tmp_path):
+    source_bus = tmp_path / "source?bus#one.sqlite"
+    assert run_cli("--bus", str(source_bus), "init", "--project", "demo").returncode == 0
+    thread = run_cli(
+        "--bus",
+        str(source_bus),
+        "start-thread",
+        "--project",
+        "demo",
+        "--title",
+        "uri chars",
+    )
+    assert thread.returncode == 0, thread.stderr
+
+    backup = tmp_path / "backup?copy#one.sqlite"
+    backed_up = run_cli("--bus", str(source_bus), "backup", "--out", str(backup))
+    assert backed_up.returncode == 0, backed_up.stderr
+
+    replacement_bus = tmp_path / "replacement?bus#one.sqlite"
+    assert (
+        run_cli("--bus", str(replacement_bus), "init", "--project", "demo").returncode
+        == 0
+    )
+    restored = run_cli("--bus", str(replacement_bus), "restore", "--from", str(backup))
+    assert restored.returncode == 0, restored.stderr
+    with sqlite3.connect(replacement_bus) as db:
+        assert [row[0] for row in db.execute("select title from threads")] == [
+            "uri chars"
+        ]
+
+
 def test_restore_validates_backup_and_refuses_active_target(run_cli, temp_bus, tmp_path):
     assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
     original = run_cli(

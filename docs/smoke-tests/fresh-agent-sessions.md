@@ -9,8 +9,9 @@ Run from this repository:
 
 ```sh
 ROOT=/Users/rob/Downloads/git/agents-together
-BUS=/tmp/agents-together-smoke.db
-rm -f "$BUS"
+BUS_DIR=$(mktemp -d)
+chmod 700 "$BUS_DIR"
+BUS="$BUS_DIR/bus.sqlite"
 cd "$ROOT"
 
 python -m agent_comm --version
@@ -23,6 +24,7 @@ run_agent_comm() {
 run_agent_comm --bus "$BUS" init --project agents-together-smoke
 run_agent_comm --bus "$BUS" register --agent planner --display-name "Planner" --harness codex --role planner
 run_agent_comm --bus "$BUS" register --agent implementer --display-name "Implementer" --harness claude --role implementer
+printf 'BUS=%s\n' "$BUS"
 ```
 
 Use `python -m agent_comm` for a source checkout smoke test. Use `agent-comm`
@@ -64,13 +66,17 @@ Start a fresh planner agent session and invoke:
 Tell the planner to use this runtime:
 
 ```text
-python -m agent_comm --bus /tmp/agents-together-smoke.db
+python -m agent_comm --bus <BUS printed by setup>
 ```
 
 Then create and send the handoff:
 
 ```sh
-BUS=/tmp/agents-together-smoke.db
+BUS="<paste BUS printed by setup>"
+case "$BUS" in
+  *"<paste"*) echo "replace pasted bus value before running"; exit 1 ;;
+esac
+
 run_agent_comm() {
   python -m agent_comm "$@"
 }
@@ -119,17 +125,17 @@ Start a fresh implementer agent session and invoke:
 Tell the implementer to use this runtime:
 
 ```text
-python -m agent_comm --bus /tmp/agents-together-smoke.db
+python -m agent_comm --bus <BUS printed by setup>
 ```
 
 Then read, show, acknowledge, and reply to the handoff:
 
 ```sh
-BUS=/tmp/agents-together-smoke.db
+BUS="<paste BUS printed by setup>"
 THREAD_ID="<paste THREAD_ID printed by planner>"
 MSG_PLANNER_TO_IMPLEMENTER="<paste MSG_PLANNER_TO_IMPLEMENTER printed by planner>"
-case "$THREAD_ID:$MSG_PLANNER_TO_IMPLEMENTER" in
-  *"<paste"*) echo "replace pasted planner values before running"; exit 1 ;;
+case "$BUS:$THREAD_ID:$MSG_PLANNER_TO_IMPLEMENTER" in
+  *"<paste"*) echo "replace pasted bus and planner values before running"; exit 1 ;;
 esac
 
 run_agent_comm() {
@@ -165,11 +171,11 @@ session.
 Return to the planner session:
 
 ```sh
-BUS=/tmp/agents-together-smoke.db
+BUS="<paste BUS printed by setup>"
 THREAD_ID="<paste THREAD_ID printed by planner>"
 MSG_IMPLEMENTER_TO_PLANNER="<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>"
-case "$THREAD_ID:$MSG_IMPLEMENTER_TO_PLANNER" in
-  *"<paste"*) echo "replace pasted planner and implementer values before running"; exit 1 ;;
+case "$BUS:$THREAD_ID:$MSG_IMPLEMENTER_TO_PLANNER" in
+  *"<paste"*) echo "replace pasted bus, planner, and implementer values before running"; exit 1 ;;
 esac
 
 run_agent_comm() {

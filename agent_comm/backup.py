@@ -65,7 +65,7 @@ def backup_bus(
     temp = _private_temp_path(output)
     try:
         _create_private_file(temp)
-        with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as source_db:
+        with sqlite3.connect(_read_only_uri(source), uri=True) as source_db:
             with sqlite3.connect(temp) as target_db:
                 source_db.backup(target_db)
         _make_standalone(temp)
@@ -92,7 +92,7 @@ def restore_bus(
     lock = _acquire_target_lock(target)
     try:
         _create_private_file(temp)
-        with sqlite3.connect(f"file:{backup}?mode=ro", uri=True) as source_db:
+        with sqlite3.connect(_read_only_uri(backup), uri=True) as source_db:
             with sqlite3.connect(temp) as target_db:
                 source_db.backup(target_db)
         _make_standalone(temp)
@@ -119,7 +119,7 @@ def _validate_database(path: Path, *, read_only: bool = False) -> None:
         raise BusError(f"backup database does not exist: {path}")
     try:
         db = (
-            sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            sqlite3.connect(_read_only_uri(path), uri=True)
             if read_only
             else sqlite3.connect(path)
         )
@@ -148,6 +148,10 @@ def _acquire_target_lock(path: Path) -> sqlite3.Connection:
         db.close()
         raise BusError(f"cannot acquire exclusive access to target bus: {path}") from exc
     return db
+
+
+def _read_only_uri(path: Path) -> str:
+    return f"{path.resolve().as_uri()}?mode=ro"
 
 
 def _ensure_private_parent(path: Path) -> None:
