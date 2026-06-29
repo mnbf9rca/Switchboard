@@ -7,7 +7,9 @@ import sys
 import time
 
 from . import __version__
-from .db import BusError, UnsupportedSchemaVersion, check_bus, initialize_bus
+from .backup import backup_bus, restore_bus
+from .db import BusError, UnsupportedSchemaVersion, initialize_bus
+from .doctor import core_health
 from .paths import BusResolutionError, resolve_bus_path
 from .repository import Artifact, Message, Repository, Thread
 
@@ -54,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.set_defaults(handler=_handle_init)
         elif command == "doctor":
             subparser.set_defaults(handler=_handle_doctor)
+        elif command == "backup":
+            subparser.add_argument("--out", required=True)
+            subparser.set_defaults(handler=_handle_backup)
+        elif command == "restore":
+            subparser.add_argument("--from", dest="from_path", required=True)
+            subparser.set_defaults(handler=_handle_restore)
         elif command == "migrate":
             subparser.set_defaults(handler=_handle_migrate)
         elif command == "register":
@@ -128,14 +136,34 @@ def _handle_init(args: argparse.Namespace) -> int:
 def _handle_doctor(args: argparse.Namespace) -> int:
     try:
         path = resolve_bus_path(args.bus, args.project, cwd=None)
-        check_bus(path)
+        lines = core_health(path)
     except UnsupportedSchemaVersion as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     except (BusResolutionError, BusError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print("agent-comm doctor: ok")
+    print("\n".join(lines))
+    return 0
+
+
+def _handle_backup(args: argparse.Namespace) -> int:
+    try:
+        path = resolve_bus_path(args.bus, args.project, cwd=None)
+        output = backup_bus(path, args.out)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+    print(f"backup: {output}")
+    return 0
+
+
+def _handle_restore(args: argparse.Namespace) -> int:
+    try:
+        path = resolve_bus_path(args.bus, args.project, cwd=None)
+        restored = restore_bus(path, args.from_path)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+    print(f"restored: {restored}")
     return 0
 
 
