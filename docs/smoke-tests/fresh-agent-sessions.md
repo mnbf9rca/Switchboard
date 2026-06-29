@@ -15,7 +15,7 @@ BUS="$BUS_DIR/bus.sqlite"
 cd "$ROOT"
 
 python scripts/build_codex_plugin.py
-python -m agent_comm --version
+python3.12 -m agent_comm --version
 command -v agent-comm >/dev/null && agent-comm --version
 agent-comm --version
 

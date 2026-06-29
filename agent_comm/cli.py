@@ -37,6 +37,8 @@ COMMANDS = (
     "migrate",
 )
 
+MIN_PYTHON = (3, 12)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -721,6 +723,15 @@ def _print_status_message_item(message: Message) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if sys.version_info < MIN_PYTHON:
+        current = ".".join(str(part) for part in sys.version_info[:3])
+        required = ".".join(str(part) for part in MIN_PYTHON)
+        print(
+            f"ERROR: agent-comm requires Python {required} or newer; "
+            f"{sys.executable} is Python {current}.",
+            file=sys.stderr,
+        )
+        return 1
     parser = build_parser()
     args = parser.parse_args(argv)
     handler = getattr(args, "handler", None)

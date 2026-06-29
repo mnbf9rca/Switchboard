@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+
+import agent_comm.cli
 
 
 def test_help_and_version_work(run_cli):
@@ -19,6 +22,24 @@ def test_python_module_entrypoint_matches_cli(run_cli, run_module_cli):
     assert result.returncode == 0
     assert cli_result.returncode == 0
     assert "durable local mailbox" in result.stdout.lower()
+
+
+def test_cli_rejects_unsupported_python_before_version(monkeypatch, capsys):
+    monkeypatch.setattr(agent_comm.cli.sys, "version_info", (3, 11, 9, "final", 0))
+    monkeypatch.setattr(
+        agent_comm.cli.sys,
+        "version",
+        "3.11.9 (test unsupported interpreter)",
+    )
+
+    result = agent_comm.cli.main(["--version"])
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert captured.out == ""
+    assert "requires Python 3.12 or newer" in captured.err
+    assert sys.executable in captured.err
+    assert "agent-comm 0.1.0" not in captured.out + captured.err
 
 
 def test_local_sqlite_bus_artifacts_are_ignored():

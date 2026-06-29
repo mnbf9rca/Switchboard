@@ -91,6 +91,11 @@ def test_skills_have_required_frontmatter_and_trigger_rich_descriptions():
         for trigger in expected["triggers"]:
             assert trigger in frontmatter["description"]
         assert "agent-comm --version" in body
+        assert "python3.12 -m agent_comm --version" in body
+        assert "py -3.12 -m agent_comm --version" in body
+        assert "uv run agent-comm --version" in body
+        assert "python3 -m agent_comm --version" not in body
+        assert "python -m agent_comm --version" not in body
 
 
 def test_each_skill_has_protocol_reference_and_validator_confirms_duplication():
