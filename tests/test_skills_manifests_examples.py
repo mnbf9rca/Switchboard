@@ -1,0 +1,380 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+from pathlib import Path
+import subprocess
+
+from conftest import OLD_ACTIVE_NAMES
+from scripts.validate_skill_protocols import validate_skill_protocols
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+SKILLS = {
+    "coordinate-as-planner": {
+        "description": "Coordinate as the planning agent using Switchboard. Use when preparing implementation handoffs, sending deliberate messages to implementers, answering implementation questions, reviewing ready work, or accepting completed work through a durable local agent mailbox.",
+        "triggers": [
+            "preparing implementation handoffs",
+            "sending deliberate messages",
+            "answering implementation questions",
+            "reviewing ready work",
+            "accepting completed work",
+            "durable local agent mailbox",
+        ],
+    },
+    "coordinate-as-implementer": {
+        "description": "Coordinate as the implementation agent using Switchboard. Use when receiving planner handoffs, reading durable agent messages, acknowledging work, asking implementation questions, reporting blockers, or signaling ready-for-review work through a local mailbox.",
+        "triggers": [
+            "receiving planner handoffs",
+            "reading durable agent messages",
+            "acknowledging work",
+            "asking implementation questions",
+            "reporting blockers",
+            "signaling ready-for-review work",
+            "local mailbox",
+        ],
+    },
+}
+
+FORBIDDEN_TERMS = [
+    "post --type",
+    "wait --type",
+    "allow-unstructured",
+    "Intent:",
+    "Thread-State:",
+    "stale claim",
+    "checkpoint",
+    ".agent-comm.json",
+    ".agent-comm.local.json",
+    "events table",
+    "status/export",
+    "agent-comm status",
+    "agent-comm export",
+]
+EXAMPLE_HEADER_PATTERNS = [
+    "Requested action:",
+    "Expected reply:",
+    "Constraints:",
+    "Verification:",
+]
+
+EXAMPLES = [
+    "planner-handoff.md",
+    "implementer-question.md",
+    "implementer-blocker.md",
+    "ready-for-review.md",
+    "review-findings.md",
+]
+
+def parse_frontmatter(path: Path) -> tuple[dict[str, str], str]:
+    text = path.read_text()
+    assert text.startswith("---\n"), f"{path} is missing YAML frontmatter"
+    _, raw_frontmatter, body = text.split("---\n", 2)
+    frontmatter: dict[str, str] = {}
+    for line in raw_frontmatter.splitlines():
+        key, value = line.split(": ", 1)
+        frontmatter[key] = value
+    return frontmatter, body
+
+
+def test_skills_have_required_frontmatter_and_trigger_rich_descriptions():
+    for skill_name, expected in SKILLS.items():
+        path = ROOT / "skills" / skill_name / "SKILL.md"
+        frontmatter, body = parse_frontmatter(path)
+
+        assert set(frontmatter) == {"name", "description"}
+        assert frontmatter["name"] == skill_name
+        assert frontmatter["name"] == path.parent.name
+        assert frontmatter["description"] == expected["description"]
+        for trigger in expected["triggers"]:
+            assert trigger in frontmatter["description"]
+        assert "switchboard --version" in body
+        assert "python3.12 -m switchboard --version" in body
+        assert "py -3.12 -m switchboard --version" in body
+        assert "uv run switchboard --version" in body
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in body
+
+
+def test_each_skill_has_protocol_reference_and_validator_confirms_duplication():
+    paths = [
+        ROOT / "skills" / skill_name / "references" / "switchboard-protocol.md"
+        for skill_name in SKILLS
+    ]
+    for path in paths:
+        assert path.exists()
+
+    validate_skill_protocols(ROOT)
+
+
+def test_protocol_guides_agent_communication_not_cli_help():
+    protocol = (
+        ROOT
+        / "skills"
+        / "coordinate-as-planner"
+        / "references"
+        / "switchboard-protocol.md"
+    ).read_text()
+
+    for section in (
+        "## Communication Principles",
+        "## What To Include",
+        "## Planner Behavior",
+        "## Implementer Behavior",
+        "## Threads, Replies, and Artifacts",
+        "## Waiting and Monitoring",
+        "## Conflict Handling",
+        "## Minimal Command Appendix",
+    ):
+        assert section in protocol
+
+    for guidance in (
+        "Send a mailbox message when another agent must act",
+        "Do not send routine progress updates",
+        "Every message should be addressed, intentional, and useful on its own",
+        "The requested action or decision.",
+        "Avoid ceremony and rigid headers",
+        "Create or update project artifacts before messaging",
+        "read your inbox before starting work",
+        "Acknowledge only after reading",
+        "Use one thread for one coherent stream of work or review",
+        "Use wait or follow only when you are actually blocked",
+        "Do not invent precedence rules in the tool layer",
+        "Include the worktree name or branch in your agent id",
+    ):
+        assert guidance in protocol
+
+    for guidance in (
+        "switchboard send --as",
+        "switchboard reply <message-id> --as",
+        "switchboard next --as",
+        "Use ack explicitly when you read without replying",
+    ):
+        assert guidance in protocol
+
+    command_appendix = protocol.split("## Minimal Command Appendix", 1)[1]
+    before_appendix = protocol.split("## Minimal Command Appendix", 1)[0]
+    assert before_appendix.count("switchboard ") == 0
+    assert command_appendix.count("switchboard ") <= 14
+
+    for old_command in (
+        *OLD_ACTIVE_NAMES,
+        "switchboard register",
+        "switchboard start-thread",
+        "switchboard post",
+        "--body-file <path>",
+    ):
+        assert old_command not in command_appendix
+
+    for old_name in OLD_ACTIVE_NAMES:
+        assert old_name not in protocol
+
+    planner_skill = (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").read_text()
+    implementer_skill = (
+        ROOT / "skills" / "coordinate-as-implementer" / "SKILL.md"
+    ).read_text()
+    for skill_text in (planner_skill, implementer_skill):
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in skill_text
+
+    for required in (
+        "Do not inspect CLI help before using the normal workflow",
+        "include role and worktree",
+        "Do not use a repo-local mailbox",
+        "STOP and ask for clarification",
+    ):
+        assert required in planner_skill
+        assert required in implementer_skill
+
+    for required in (
+        "Use `--artifact PATH` only when durable project context belongs in a file",
+        "Use `--wait` only when blocked on the reply",
+    ):
+        assert required in planner_skill
+
+    for required in (
+        "reply automatically acknowledges",
+        "Use `switchboard ack --as",
+    ):
+        assert required in implementer_skill
+
+
+def test_plugin_manifests_expose_skills_as_harness_adapters():
+    claude_expected = {
+        "name": "switchboard",
+        "displayName": "Switchboard",
+        "version": "0.2.0",
+        "description": "A local mailbox for deliberate agent coordination",
+        "author": {"name": "mnbf9rca"},
+        "license": "MIT",
+        "keywords": [
+            "agent-coordination",
+            "agent-skills",
+            "sqlite",
+            "codex",
+            "claude",
+        ],
+        "skills": "./skills/",
+    }
+    assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text()) == claude_expected
+
+    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
+    assert codex["name"] == claude_expected["name"]
+    assert codex["version"] == claude_expected["version"]
+    assert codex["description"] == claude_expected["description"]
+    assert codex["license"] == claude_expected["license"]
+    assert codex["skills"] == claude_expected["skills"]
+    assert codex["keywords"] == claude_expected["keywords"]
+    assert isinstance(codex["author"], dict)
+    assert codex["author"] == claude_expected["author"]
+    assert isinstance(codex["interface"], dict)
+    assert codex["interface"]["displayName"] == claude_expected["displayName"]
+    assert codex["interface"]["developerName"] == claude_expected["author"]["name"]
+    for key in (
+        "displayName",
+        "shortDescription",
+        "longDescription",
+        "developerName",
+        "category",
+        "capabilities",
+    ):
+        assert codex["interface"][key]
+
+
+def test_repo_local_codex_marketplace_exposes_plugin_root():
+    marketplace_root = ROOT / ".agents" / "plugins"
+    marketplace = json.loads((marketplace_root / "marketplace.json").read_text())
+
+    assert marketplace == {
+        "name": "switchboard-local",
+        "interface": {
+            "displayName": "Switchboard Local",
+        },
+        "plugins": [
+            {
+                "name": "switchboard",
+                "source": {
+                    "source": "local",
+                    "path": "./",
+                },
+                "policy": {
+                    "installation": "AVAILABLE",
+                    "authentication": "ON_INSTALL",
+                },
+                "category": "Productivity",
+            }
+        ],
+    }
+
+    assert (ROOT / ".codex-plugin" / "plugin.json").is_file()
+    assert (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").is_file()
+
+
+def test_plugin_launcher_runs_from_outside_repo(tmp_path):
+    launcher = ROOT / "scripts" / "switchboard"
+
+    assert launcher.is_file()
+    assert os.access(launcher, os.X_OK)
+
+    result = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=tmp_path,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert result.stdout.strip() == "switchboard 0.2.0"
+
+
+def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
+    launcher = ROOT / "scripts" / "switchboard"
+    fake_python = tmp_path / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env sh\n"
+        "case \"$1\" in\n"
+        "  -c) exit 1 ;;\n"
+        "  *) echo 'unsupported python should not run agent_comm' >&2; exit 42 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    result = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=tmp_path,
+        env={**os.environ, "PYTHON_BIN": str(fake_python)},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert result.returncode == 127
+    assert result.stdout == ""
+    assert "requires Python 3.12 or newer" in result.stderr
+    assert "unsupported python should not run agent_comm" not in result.stderr
+
+
+def test_repo_root_is_the_plugin_source_tree():
+    expected_files = [
+        ".codex-plugin/plugin.json",
+        ".claude-plugin/plugin.json",
+        "README.md",
+        "switchboard/__main__.py",
+        "switchboard/cli.py",
+        "scripts/switchboard",
+        "skills/coordinate-as-planner/SKILL.md",
+        "skills/coordinate-as-planner/references/switchboard-protocol.md",
+        "skills/coordinate-as-implementer/SKILL.md",
+        "skills/coordinate-as-implementer/references/switchboard-protocol.md",
+    ]
+    for relative_path in expected_files:
+        assert (ROOT / relative_path).is_file()
+
+    for forbidden in (
+        "scripts/build_codex_plugin.py",
+        "scripts/build_plugin_bundle.py",
+        "plugins/switchboard/.generated.json",
+    ):
+        assert not (ROOT / forbidden).exists()
+
+    launcher = ROOT / "scripts" / "switchboard"
+    assert os.access(launcher, os.X_OK)
+    version = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert version.stdout.strip() == "switchboard 0.2.0"
+
+
+def test_examples_exist_as_markdown_message_bodies():
+    for name in EXAMPLES:
+        path = ROOT / "examples" / name
+        text = path.read_text()
+        assert text.startswith("# ")
+        for old_name in OLD_ACTIVE_NAMES:
+            assert old_name not in text
+        for pattern in EXAMPLE_HEADER_PATTERNS:
+            assert pattern not in text
+
+
+def test_skill_layer_does_not_reference_unimplemented_or_forbidden_protocol_terms():
+    paths = [
+        *ROOT.glob("skills/**/SKILL.md"),
+        *ROOT.glob("skills/**/references/*.md"),
+        *ROOT.glob("examples/*.md"),
+        ROOT / ".codex-plugin" / "plugin.json",
+        ROOT / ".claude-plugin" / "plugin.json",
+    ]
+    assert paths
+    for path in paths:
+        text = path.read_text()
+        for term in FORBIDDEN_TERMS:
+            assert term not in text, f"{path} contains forbidden term {term!r}"

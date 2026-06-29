@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+PLUGIN_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
+
+if [ -n "${PYTHON_BIN:-}" ]; then
+  if "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then
+    PYTHONPATH="$PLUGIN_ROOT${PYTHONPATH:+:$PYTHONPATH}" exec "$PYTHON_BIN" -m switchboard "$@"
+  fi
+
+  echo "switchboard requires Python 3.12 or newer on PATH" >&2
+  exit 127
+fi
+
+for candidate in python3.12 python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 \
+    && "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then
+    PYTHONPATH="$PLUGIN_ROOT${PYTHONPATH:+:$PYTHONPATH}" exec "$candidate" -m switchboard "$@"
+  fi
+done
+
+echo "switchboard requires Python 3.12 or newer on PATH" >&2
+exit 127

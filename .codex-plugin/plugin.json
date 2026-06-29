@@ -1,0 +1,31 @@
+{
+  "name": "switchboard",
+  "version": "0.2.0",
+  "description": "A local mailbox for deliberate agent coordination",
+  "author": {
+    "name": "mnbf9rca"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent-coordination",
+    "agent-skills",
+    "sqlite",
+    "codex",
+    "claude"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Switchboard",
+    "shortDescription": "A local mailbox for deliberate agent coordination",
+    "longDescription": "Coordinate planner and implementer agents through local Agent Skills and the Switchboard mailbox.",
+    "developerName": "mnbf9rca",
+    "category": "Productivity",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Coordinate this task as planner.",
+      "Coordinate this task as implementer."
+    ]
+  }
+}

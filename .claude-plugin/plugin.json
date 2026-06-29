@@ -1,0 +1,18 @@
+{
+  "name": "switchboard",
+  "displayName": "Switchboard",
+  "version": "0.2.0",
+  "description": "A local mailbox for deliberate agent coordination",
+  "author": {
+    "name": "mnbf9rca"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agent-coordination",
+    "agent-skills",
+    "sqlite",
+    "codex",
+    "claude"
+  ],
+  "skills": "./skills/"
+}
