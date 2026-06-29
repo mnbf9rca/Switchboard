@@ -175,7 +175,8 @@ def test_protocol_guides_agent_communication_not_cli_help():
     for required in (
         "Do not inspect CLI help before using the normal workflow",
         "include role and worktree",
-        "ask the user before using a repo-local mailbox",
+        "Do not use a repo-local mailbox",
+        "STOP and ask for clarification",
     ):
         assert required in planner_skill
         assert required in implementer_skill
@@ -196,7 +197,7 @@ def test_protocol_guides_agent_communication_not_cli_help():
 def test_plugin_manifests_expose_skills_as_harness_adapters():
     claude_expected = {
         "name": "agents-together",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "description": "Durable local coordination workflows for independent coding agents",
         "skills": "./skills/",
     }
@@ -265,7 +266,7 @@ def test_plugin_launcher_runs_from_outside_repo(tmp_path):
         stderr=subprocess.PIPE,
     )
 
-    assert result.stdout.strip() == "agent-comm 0.1.0"
+    assert result.stdout.strip() == "agent-comm 0.1.1"
 
 
 def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
@@ -316,7 +317,7 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
 
     assert "Built Codex plugin" in result.stdout
     manifest = json.loads((output / ".codex-plugin" / "plugin.json").read_text())
-    assert manifest["version"] == "0.1.0+codex.test-123"
+    assert manifest["version"] == "0.1.1+codex.test-123"
 
     expected_files = [
         ".codex-plugin/plugin.json",
@@ -354,7 +355,7 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    assert version.stdout.strip() == "agent-comm 0.1.0"
+    assert version.stdout.strip() == "agent-comm 0.1.1"
 
 
 def test_examples_exist_as_markdown_message_bodies():

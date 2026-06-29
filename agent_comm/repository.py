@@ -61,8 +61,9 @@ class ReplyLink:
 
 
 class Repository:
-    def __init__(self, bus_path: str | Path):
+    def __init__(self, bus_path: str | Path, *, readonly: bool = False):
         self.bus_path = Path(bus_path)
+        self.readonly = readonly
 
     def register_agent(
         self,
@@ -95,7 +96,7 @@ class Repository:
                 """,
                 (agent_id,),
             )
-            db.commit()
+            _commit_and_checkpoint(db)
         return _agent(row)
 
     def get_agent(self, agent_id: str) -> Agent:
@@ -122,7 +123,7 @@ class Repository:
                 """,
                 (thread_id, project_id, title, now, now),
             )
-            db.commit()
+            _commit_and_checkpoint(db)
         return Thread(thread_id, project_id, title, now, now)
 
     def get_thread(self, thread_id: str) -> Thread:
@@ -240,7 +241,7 @@ class Repository:
                     "update threads set updated_at = ? where id = ?",
                     (now, thread_id),
                 )
-                db.commit()
+                _commit_and_checkpoint(db)
             except Exception:
                 db.rollback()
                 raise
@@ -292,7 +293,7 @@ class Repository:
                     "update messages set acked_at = ? where id = ?",
                     (acked_at, message_id),
                 )
-                db.commit()
+                _commit_and_checkpoint(db)
             except Exception:
                 db.rollback()
                 raise
@@ -355,7 +356,7 @@ class Repository:
                     "update threads set updated_at = ? where id = ?",
                     (now, thread_id),
                 )
-                db.commit()
+                _commit_and_checkpoint(db)
             except Exception:
                 db.rollback()
                 raise
@@ -397,7 +398,7 @@ class Repository:
             db.close()
 
     def _connect(self) -> sqlite3.Connection:
-        db = open_bus(self.bus_path)
+        db = open_bus(self.bus_path, readonly=self.readonly)
         db.row_factory = sqlite3.Row
         version = int(db.execute("pragma user_version").fetchone()[0])
         if version != SCHEMA_VERSION:
@@ -439,6 +440,11 @@ def _dedupe(values: Iterable[str]) -> list[str]:
             seen.add(value)
             deduped.append(value)
     return deduped
+
+
+def _commit_and_checkpoint(db: sqlite3.Connection) -> None:
+    db.commit()
+    db.execute("pragma wal_checkpoint(TRUNCATE)")
 
 
 def _one(

@@ -5,7 +5,7 @@ description: Coordinate as the implementation agent using agent-comm. Use when r
 
 # Coordinate as Implementer
 
-Use this skill when you are acting in the implementer role for a task planned or reviewed through `agent-comm`. Planner and implementer are roles and conventions, not fixed identities. Agent IDs are arbitrary labels chosen for the current collaboration.
+Use this skill when you are acting in the implementer role for a task planned or reviewed through `agent-comm`. Planner and implementer are roles and conventions, not fixed identities. Agent IDs are arbitrary labels chosen for the current collaboration. If the user explicitly assigns a role that conflicts with this skill, STOP and ask for clarification before using the mailbox.
 
 ## Command Discovery
 
@@ -21,7 +21,7 @@ Use the first command form that works. Runtime instructions should prefer the pl
 
 ## Implementer Workflow
 
-At the start of work, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. If the shared user-local mailbox is blocked by sandbox permissions, ask the user before using a repo-local mailbox. Read your inbox before acting.
+At the start of work, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. Do not use a repo-local mailbox. If sandbox permissions block the shared user-local mailbox, stop and request permission for the shared mailbox instead. Read your inbox before acting.
 
 Choose `<implementer-id>` to include role and worktree, such as `implementer-feature-a`. Use `agent-comm next --as <implementer-id>` to read the next unread message.
 

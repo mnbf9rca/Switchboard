@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from pathlib import Path
+import sqlite3
 import sys
 import time
 
@@ -307,7 +308,7 @@ def _derive_title(body: str) -> str:
 def _handle_inbox(args: argparse.Namespace) -> int:
     try:
         agent = _agent_arg(args)
-        messages = _repo_create(args).inbox(agent)
+        messages = _repo_read(args).inbox(agent)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     _print_messages(messages, include_body=False)
@@ -316,7 +317,7 @@ def _handle_inbox(args: argparse.Namespace) -> int:
 
 def _handle_show(args: argparse.Namespace) -> int:
     try:
-        repo = _repo_create(args)
+        repo = _repo_read(args)
         message = repo.get_message(args.message)
         artifacts = repo.artifacts_for_message(args.message)
     except _CLI_ERRORS as exc:
@@ -329,7 +330,7 @@ def _handle_show(args: argparse.Namespace) -> int:
 def _handle_ack(args: argparse.Namespace) -> int:
     try:
         agent = _agent_arg(args)
-        message = _repo_create(args).ack_message(args.message, agent)
+        message = _repo(args).ack_message(args.message, agent)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     print(f"message: {message.id}")
@@ -343,7 +344,7 @@ def _handle_wait(args: argparse.Namespace) -> int:
         return 1
     try:
         agent = _agent_arg(args)
-        repo = _repo_create(args)
+        repo = _repo_read(args)
         messages = _wait_for_messages(
             repo,
             agent,
@@ -364,7 +365,7 @@ def _handle_wait(args: argparse.Namespace) -> int:
 def _handle_reply(args: argparse.Namespace) -> int:
     try:
         body = _read_body(args)
-        repo = _repo_create(args)
+        repo = _repo(args)
         original = repo.get_message(args.message_id)
         if original.to_agent != args.as_agent:
             raise PermissionError("only the message recipient can reply")
@@ -401,7 +402,7 @@ def _handle_reply(args: argparse.Namespace) -> int:
 
 def _handle_next(args: argparse.Namespace) -> int:
     try:
-        messages = _repo_create(args).inbox(args.as_agent)
+        messages = _repo_read(args).inbox(args.as_agent)
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     if not messages:
@@ -470,14 +471,20 @@ _CLI_ERRORS = (
     UnsupportedSchemaVersion,
     ValueError,
     PermissionError,
+    sqlite3.Error,
 )
 
 
 def _repo(args: argparse.Namespace) -> Repository:
     path = _bus_path(args)
     if not path.exists():
-        raise BusError(f"bus database does not exist: {path}")
+        raise BusError(f"mailbox does not exist; send a message first: {path}")
     return Repository(path)
+
+
+def _repo_read(args: argparse.Namespace) -> Repository:
+    path = _bus_path(args)
+    return Repository(path, readonly=True)
 
 
 def _repo_create(args: argparse.Namespace) -> Repository:
@@ -738,4 +745,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if handler is None:
         parser.print_help()
         return 0
-    return handler(args)
+    try:
+        return handler(args)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)

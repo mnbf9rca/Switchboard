@@ -9,8 +9,7 @@ Runtime invocation:
 
 ```sh
 agent-comm --help
-python3 -m agent_comm --help
-python -m agent_comm --help
+python3.12 -m agent_comm --help
 ```
 
 Development invocation uses `uv` only as a developer convenience:

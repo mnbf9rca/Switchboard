@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote
 
 SCHEMA_VERSION = 1
 BUSY_TIMEOUT_MS = 5000
@@ -16,12 +17,23 @@ class UnsupportedSchemaVersion(BusError):
     """Raised when a bus was created by a newer CLI."""
 
 
-def open_bus(path: str | os.PathLike[str]) -> sqlite3.Connection:
+def open_bus(
+    path: str | os.PathLike[str],
+    *,
+    readonly: bool = False,
+) -> sqlite3.Connection:
     bus_path = Path(path).expanduser()
-    _ensure_private_database_path(bus_path)
-    db = sqlite3.connect(bus_path)
+    if readonly:
+        _require_existing_database_path(bus_path)
+        db = sqlite3.connect(_read_only_uri(bus_path), uri=True)
+    else:
+        _ensure_private_database_path(bus_path)
+        db = sqlite3.connect(bus_path)
     try:
-        _configure_connection(db)
+        if readonly:
+            _configure_read_connection(db)
+        else:
+            _configure_connection(db)
         _check_supported_version(db)
     except Exception:
         db.close()
@@ -36,7 +48,7 @@ def initialize_bus(path: str | os.PathLike[str], project_id: str) -> sqlite3.Con
         if version == 0:
             _create_schema(db)
             db.execute(f"pragma user_version = {SCHEMA_VERSION}")
-            db.commit()
+            _commit_and_checkpoint(db)
         elif version < SCHEMA_VERSION:
             raise BusError(
                 f"schema version {version} requires migration; run agent-comm migrate"
@@ -80,6 +92,13 @@ def _ensure_private_database_path(path: Path) -> None:
         _require_private_permissions(path, 0o600, "bus database")
 
 
+def _require_existing_database_path(path: Path) -> None:
+    if not path.exists():
+        raise BusError(f"mailbox does not exist; send a message first: {path}")
+    _require_private_permissions(path.parent, 0o700, "bus directory")
+    _require_private_permissions(path, 0o600, "bus database")
+
+
 def _make_private_dirs(path: Path) -> None:
     missing = []
     current = path
@@ -113,6 +132,20 @@ def _configure_connection(db: sqlite3.Connection) -> None:
     journal_mode = db.execute("pragma journal_mode = WAL").fetchone()[0]
     if str(journal_mode).lower() != "wal":
         raise BusError("failed to enable WAL journal mode")
+
+
+def _configure_read_connection(db: sqlite3.Connection) -> None:
+    db.execute(f"pragma busy_timeout = {BUSY_TIMEOUT_MS}")
+    db.execute("pragma query_only = ON")
+
+
+def _read_only_uri(path: Path) -> str:
+    return f"file:{quote(path.resolve().as_posix())}?mode=ro&immutable=1"
+
+
+def _commit_and_checkpoint(db: sqlite3.Connection) -> None:
+    db.commit()
+    db.execute("pragma wal_checkpoint(TRUNCATE)")
 
 
 def _check_supported_version(db: sqlite3.Connection) -> None:

@@ -403,15 +403,14 @@ def test_artifact_add_links_thread_and_optional_message(run_cli, temp_bus, tmp_p
     assert "docs/handoff.md" in show.stdout
 
 
-def test_show_auto_initializes_empty_bus_for_missing_message(run_cli, tmp_path):
+def test_show_missing_bus_fails_without_creating_mailbox(run_cli, tmp_path):
     missing_bus = tmp_path / "missing.sqlite"
 
     result = run_cli("--bus", str(missing_bus), "show", "msg_missing")
 
     assert result.returncode != 0
-    assert "record not found" in result.stderr
-    assert "does not exist" not in result.stderr
-    assert missing_bus.exists()
+    assert "mailbox does not exist; send a message first" in result.stderr
+    assert not missing_bus.exists()
 
 
 def test_send_inline_auto_initializes_registers_and_posts(run_cli, temp_bus):
@@ -860,42 +859,48 @@ def test_inbox_and_wait_accept_as_alias(run_cli, temp_bus):
     assert _acked_at(temp_bus, message_id) is None
 
 
-def test_high_level_read_commands_auto_initialize_empty_bus(run_cli, tmp_path):
+def test_read_command_does_not_create_sqlite_sidecars(run_cli, temp_bus):
+    send = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "Existing mailbox read.",
+    )
+    assert send.returncode == 0, send.stderr
+
+    with sqlite3.connect(temp_bus) as db:
+        db.execute("pragma wal_checkpoint(TRUNCATE)")
+    for suffix in ("-wal", "-shm"):
+        temp_bus.with_name(f"{temp_bus.name}{suffix}").unlink(missing_ok=True)
+
+    inbox = run_cli("--bus", str(temp_bus), "inbox", "--as", "implementer-feature-a")
+
+    assert inbox.returncode == 0, inbox.stderr
+    assert "Existing mailbox read." in inbox.stdout
+    for suffix in ("-wal", "-shm"):
+        assert not temp_bus.with_name(f"{temp_bus.name}{suffix}").exists()
+
+
+def test_high_level_read_commands_do_not_create_missing_mailbox(run_cli, tmp_path):
     missing_bus = tmp_path / "empty.sqlite"
 
-    inbox = run_cli("--bus", str(missing_bus), "inbox", "--as", "implementer")
-    assert inbox.returncode == 0, inbox.stderr
-    assert inbox.stdout == ""
-    assert missing_bus.exists()
+    cases = [
+        ("inbox", "--as", "implementer"),
+        ("next", "--as", "implementer"),
+        ("show", "msg_missing"),
+        ("wait", "--as", "implementer", "--timeout", "0"),
+    ]
 
-    next_result = run_cli("--bus", str(missing_bus), "next", "--as", "implementer")
-    assert next_result.returncode == 0, next_result.stderr
-    assert next_result.stdout == ""
+    for args in cases:
+        result = run_cli("--bus", str(missing_bus), *args)
 
-    wait = run_cli(
-        "--bus",
-        str(missing_bus),
-        "wait",
-        "--as",
-        "implementer",
-        "--timeout",
-        "0",
-    )
-    assert wait.returncode != 0
-    assert "timed out" in wait.stderr
-    assert "does not exist" not in wait.stderr
-
-    ack = run_cli(
-        "--bus",
-        str(missing_bus),
-        "ack",
-        "--as",
-        "implementer",
-        "msg_missing",
-    )
-    assert ack.returncode != 0
-    assert "record not found" in ack.stderr
-    assert "does not exist" not in ack.stderr
+        assert result.returncode != 0
+        assert "mailbox does not exist; send a message first" in result.stderr
+        assert not missing_bus.exists()
 
 
 def test_read_commands_require_identity_before_creating_bus(run_cli, tmp_path):
@@ -913,6 +918,22 @@ def test_read_commands_require_identity_before_creating_bus(run_cli, tmp_path):
         assert result.returncode != 0
         assert "--as or --agent is required" in result.stderr
         assert not missing_bus.exists()
+
+
+def test_sqlite_operational_errors_do_not_show_tracebacks(monkeypatch, capsys):
+    from agent_comm import cli
+
+    def raise_readonly(_args):
+        raise sqlite3.OperationalError("attempt to write a readonly database")
+
+    monkeypatch.setattr(cli, "_handle_next", raise_readonly)
+
+    result = cli.main(["next", "--as", "implementer-main"])
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "ERROR: attempt to write a readonly database" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_send_and_next_share_default_bus_across_worktrees(

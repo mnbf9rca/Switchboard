@@ -12,11 +12,13 @@ Every message should be addressed, intentional, and useful on its own. A reader 
 
 Agent ids are explicit collaboration handles, not global user identities. Include the worktree name or branch in your agent id when multiple agents may work in different worktrees of the same project, for example `planner-main`, `implementer-feature-a`, or `reviewer-bugfix-123`. This keeps shared-mailbox messages readable without requiring the bus to understand worktree state.
 
-Normal use does not require `--project` or `--bus`; the CLI derives a shared project mailbox. If sandbox permissions block that shared mailbox, ask the user before using a repo-local mailbox.
+Normal use does not require `--project` or `--bus`; the CLI derives a shared project mailbox. Do not use a repo-local mailbox. If sandbox permissions block the shared mailbox, stop and request permission for the shared mailbox instead.
 
 Each agent identity should include role and worktree when multiple worktrees are active, such as `planner-main` or `implementer-feature-a`.
 
 Do not inspect CLI help before using this normal workflow; use help only after a command fails.
+
+If the invoked skill and the user-assigned role conflict, STOP and ask for clarification before using the mailbox.
 
 ## What To Include
 
@@ -64,7 +66,7 @@ If mailbox messages, repository artifacts, and current user direction disagree, 
 
 ## Minimal Command Appendix
 
-Use the command form discovered by the skill. Replace `agent-comm` with `python -m agent_comm` when that is the working runtime.
+Use the command form discovered by the skill. Do not substitute an unsupported Python runtime.
 
 ```sh
 agent-comm send --as <sender-id> --to <recipient-id> "short message"

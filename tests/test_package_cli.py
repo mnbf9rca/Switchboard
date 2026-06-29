@@ -13,7 +13,7 @@ def test_help_and_version_work(run_cli):
     assert "agent-comm" in help_result.stdout
     assert "init" in help_result.stdout
     assert version_result.returncode == 0
-    assert "agent-comm 0.1.0" in version_result.stdout
+    assert "agent-comm 0.1.1" in version_result.stdout
 
 
 def test_python_module_entrypoint_matches_cli(run_cli, run_module_cli):
@@ -39,7 +39,7 @@ def test_cli_rejects_unsupported_python_before_version(monkeypatch, capsys):
     assert captured.out == ""
     assert "requires Python 3.12 or newer" in captured.err
     assert sys.executable in captured.err
-    assert "agent-comm 0.1.0" not in captured.out + captured.err
+    assert "agent-comm 0.1.1" not in captured.out + captured.err
 
 
 def test_local_sqlite_bus_artifacts_are_ignored():

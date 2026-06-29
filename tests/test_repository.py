@@ -214,7 +214,11 @@ def test_repository_connection_context_closes(monkeypatch, temp_bus):
         def close(self):
             closed.append(True)
 
-    monkeypatch.setattr(repository, "open_bus", lambda path: FakeConnection())
+    monkeypatch.setattr(
+        repository,
+        "open_bus",
+        lambda path, *, readonly=False: FakeConnection(),
+    )
 
     repo = Repository(temp_bus)
 

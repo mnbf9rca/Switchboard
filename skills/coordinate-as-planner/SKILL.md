@@ -5,7 +5,7 @@ description: Coordinate as the planning agent using agent-comm. Use when prepari
 
 # Coordinate as Planner
 
-Use this skill when you are acting in the planner role for a task that involves one or more implementation agents. Planner and implementer are roles and conventions, not fixed identities. Agent IDs are arbitrary labels chosen for the current collaboration.
+Use this skill when you are acting in the planner role for a task that involves one or more implementation agents. Planner and implementer are roles and conventions, not fixed identities. Agent IDs are arbitrary labels chosen for the current collaboration. If the user explicitly assigns a role that conflicts with this skill, STOP and ask for clarification before using the mailbox.
 
 ## Command Discovery
 
@@ -21,7 +21,7 @@ Use the first command form that works. Runtime instructions should prefer the pl
 
 ## Planner Workflow
 
-At the start of coordination, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. If the shared user-local mailbox is blocked by sandbox permissions, ask the user before using a repo-local mailbox. Check your inbox before sending new instructions so you do not miss prior replies.
+At the start of coordination, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. Do not use a repo-local mailbox. If sandbox permissions block the shared user-local mailbox, stop and request permission for the shared mailbox instead. Check your inbox before sending new instructions so you do not miss prior replies.
 
 Choose `<planner-id>` to include role and worktree, such as `planner-main`. Use a dedicated thread for each coherent task or review stream when continuing existing coordination. Do not rely on chat history as the handoff record.
 
