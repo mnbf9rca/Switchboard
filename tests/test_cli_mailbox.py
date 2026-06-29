@@ -239,6 +239,7 @@ def test_inbox_show_ack_and_wait_do_not_auto_ack(run_cli, temp_bus, tmp_path):
     show = run_cli("--bus", str(temp_bus), "show", message_id)
     assert show.returncode == 0
     assert "body for inbox\n" in show.stdout
+    assert _acked_at(temp_bus, message_id) is None
 
     wrong_ack = run_cli("--bus", str(temp_bus), "ack", message_id, "--agent", "planner")
     assert wrong_ack.returncode != 0
@@ -402,14 +403,15 @@ def test_artifact_add_links_thread_and_optional_message(run_cli, temp_bus, tmp_p
     assert "docs/handoff.md" in show.stdout
 
 
-def test_mailbox_commands_do_not_create_missing_bus(run_cli, tmp_path):
+def test_show_auto_initializes_empty_bus_for_missing_message(run_cli, tmp_path):
     missing_bus = tmp_path / "missing.sqlite"
 
     result = run_cli("--bus", str(missing_bus), "show", "msg_missing")
 
     assert result.returncode != 0
-    assert "does not exist" in result.stderr
-    assert not missing_bus.exists()
+    assert "record not found" in result.stderr
+    assert "does not exist" not in result.stderr
+    assert missing_bus.exists()
 
 
 def test_send_inline_auto_initializes_registers_and_posts(run_cli, temp_bus):

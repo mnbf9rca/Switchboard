@@ -313,7 +313,7 @@ def _handle_inbox(args: argparse.Namespace) -> int:
 
 def _handle_show(args: argparse.Namespace) -> int:
     try:
-        repo = _repo(args)
+        repo = _repo_create(args)
         message = repo.get_message(args.message)
         artifacts = repo.artifacts_for_message(args.message)
     except _CLI_ERRORS as exc:
