@@ -22,6 +22,12 @@ uv run python scripts/validate_skill_protocols.py
 uv run agent-comm --help
 ```
 
+Fresh-agent plugin smoke test:
+
+```text
+docs/smoke-tests/fresh-agent-sessions.md
+```
+
 Do not paste secrets, credentials, private tokens, or large proprietary logs into
 mailbox messages. Prefer linking to project artifacts when large or sensitive
 context is needed.
