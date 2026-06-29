@@ -1,0 +1,21 @@
+{
+  "name": "agents-together",
+  "version": "0.1.0",
+  "description": "Durable local coordination workflows for independent coding agents",
+  "author": {
+    "name": "agents-together"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agents Together",
+    "shortDescription": "Durable local coordination workflows for independent coding agents",
+    "longDescription": "Coordinate planner and implementer agents through local Agent Skills and the agent-comm mailbox.",
+    "developerName": "agents-together",
+    "category": "Productivity",
+    "capabilities": ["Skills"],
+    "defaultPrompt": [
+      "Coordinate this task as planner.",
+      "Coordinate this task as implementer."
+    ]
+  }
+}

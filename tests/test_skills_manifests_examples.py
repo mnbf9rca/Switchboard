@@ -196,12 +196,29 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
         ],
     }
 
-    plugin_root = marketplace_root / "plugins" / "agents-together"
+    plugin_root = ROOT / "plugins" / "agents-together"
     assert plugin_root.is_dir()
-    assert (plugin_root / ".codex-plugin").resolve() == ROOT / ".codex-plugin"
-    assert (plugin_root / "skills").resolve() == ROOT / "skills"
-    assert (plugin_root / ".codex-plugin" / "plugin.json").exists()
-    assert (plugin_root / "skills" / "coordinate-as-planner" / "SKILL.md").exists()
+    assert not (plugin_root / ".codex-plugin").is_symlink()
+    assert not (plugin_root / "skills").is_symlink()
+    assert json.loads((plugin_root / ".codex-plugin" / "plugin.json").read_text()) == json.loads(
+        (ROOT / ".codex-plugin" / "plugin.json").read_text()
+    )
+    assert (plugin_root / "skills" / "coordinate-as-planner" / "SKILL.md").read_text() == (
+        ROOT / "skills" / "coordinate-as-planner" / "SKILL.md"
+    ).read_text()
+    assert (
+        plugin_root
+        / "skills"
+        / "coordinate-as-planner"
+        / "references"
+        / "agent-communication-protocol.md"
+    ).read_bytes() == (
+        ROOT
+        / "skills"
+        / "coordinate-as-planner"
+        / "references"
+        / "agent-communication-protocol.md"
+    ).read_bytes()
 
 
 def test_examples_exist_as_markdown_message_bodies():
