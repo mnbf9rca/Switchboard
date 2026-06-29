@@ -23,6 +23,7 @@ def test_fresh_agent_smoke_guide_documents_local_installs():
     normalized = " ".join(text.lower().split())
 
     assert ".agents/plugins" in text
+    assert "/Users/rob/Downloads/git/agents-together" in text
     assert "/plugins" in text
     assert "agents-together-local" in text
     assert ".claude-plugin/plugin.json" in text
@@ -46,7 +47,7 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
     assert "chmod 700 \"$BUS_DIR\"" in text
     assert "BUS=\"$BUS_DIR/bus.sqlite\"" in text
     assert "printf 'BUS=%s\\n' \"$BUS\"" in text
-    assert "python -m agent_comm --bus <BUS printed by setup>" in text
+    assert "<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>" in text
     assert "run_agent_comm() {" in text
 
 

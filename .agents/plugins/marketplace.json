@@ -8,7 +8,7 @@
       "name": "agents-together",
       "source": {
         "source": "local",
-        "path": "./plugins/agents-together"
+        "path": "./"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -11,13 +11,15 @@ Use this skill when you are acting in the planner role for a task that involves 
 
 Find an available runtime command in this order:
 
-1. `agent-comm --version`
-2. `python3 -m agent_comm --version`
-3. `python -m agent_comm --version`
-4. `py -3.12 -m agent_comm` for Windows where available
-5. `uv run agent-comm` for a development checkout only
+1. If this skill is loaded from an installed plugin, locate the nearest ancestor directory containing `.codex-plugin/plugin.json` and use `<plugin-root>/scripts/agent-comm --version`.
+2. `agent-comm --version`
+3. `python3.12 -m agent_comm --version`
+4. `python3 -m agent_comm --version`
+5. `python -m agent_comm --version`
+6. `py -3.12 -m agent_comm --version` for Windows where available
+7. `uv run agent-comm --version` for a development checkout only
 
-Use the first command form that works. Runtime instructions should prefer installed Python or module entry points and should not assume `uv`.
+Use the first command form that works. Runtime instructions should prefer the plugin launcher when available and should not assume `uv`.
 
 ## Planner Workflow
 

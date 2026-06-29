@@ -33,12 +33,16 @@ instead after installing the package and confirming `agent-comm --version` works
 Add the local Codex marketplace source from:
 
 ```text
-/Users/rob/Downloads/git/agents-together/.agents/plugins
+/Users/rob/Downloads/git/agents-together
 ```
 
 In Codex, use `/plugins`, add that marketplace source, then install
 `agents-together` from the `agents-together-local` marketplace. Start a new Codex
 session after installing so the skills are loaded.
+
+The marketplace file lives at `.agents/plugins/marketplace.json`, and its
+plugin source points at the repository root so the installed plugin includes
+the skills, `.codex-plugin/plugin.json`, `scripts/agent-comm`, and `agent_comm`.
 
 Expose the local Claude plugin from:
 
@@ -66,7 +70,7 @@ Start a fresh planner agent session and invoke:
 Tell the planner to use this runtime:
 
 ```text
-python -m agent_comm --bus <BUS printed by setup>
+<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>
 ```
 
 Then create and send the handoff:
@@ -125,7 +129,7 @@ Start a fresh implementer agent session and invoke:
 Tell the implementer to use this runtime:
 
 ```text
-python -m agent_comm --bus <BUS printed by setup>
+<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>
 ```
 
 Then read, show, acknowledge, and reply to the handoff:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
 
 from scripts.validate_skill_protocols import validate_skill_protocols
 
@@ -185,7 +187,7 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
                 "name": "agents-together",
                 "source": {
                     "source": "local",
-                    "path": "./plugins/agents-together",
+                    "path": "./",
                 },
                 "policy": {
                     "installation": "AVAILABLE",
@@ -196,29 +198,63 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
         ],
     }
 
-    plugin_root = ROOT / "plugins" / "agents-together"
-    assert plugin_root.is_dir()
-    assert not (plugin_root / ".codex-plugin").is_symlink()
-    assert not (plugin_root / "skills").is_symlink()
-    assert json.loads((plugin_root / ".codex-plugin" / "plugin.json").read_text()) == json.loads(
-        (ROOT / ".codex-plugin" / "plugin.json").read_text()
+
+    assert (ROOT / ".codex-plugin" / "plugin.json").is_file()
+    assert (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").is_file()
+
+
+def test_plugin_has_single_source_layout_without_nested_copies():
+    nested_plugin_root = ROOT / "plugins" / "agents-together"
+
+    assert not (nested_plugin_root / "agent_comm").exists()
+    assert not (nested_plugin_root / "skills").exists()
+    assert not (nested_plugin_root / ".codex-plugin").exists()
+
+
+def test_plugin_launcher_runs_from_outside_repo(tmp_path):
+    launcher = ROOT / "scripts" / "agent-comm"
+
+    assert launcher.is_file()
+    assert os.access(launcher, os.X_OK)
+
+    result = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=tmp_path,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    assert (plugin_root / "skills" / "coordinate-as-planner" / "SKILL.md").read_text() == (
-        ROOT / "skills" / "coordinate-as-planner" / "SKILL.md"
-    ).read_text()
-    assert (
-        plugin_root
-        / "skills"
-        / "coordinate-as-planner"
-        / "references"
-        / "agent-communication-protocol.md"
-    ).read_bytes() == (
-        ROOT
-        / "skills"
-        / "coordinate-as-planner"
-        / "references"
-        / "agent-communication-protocol.md"
-    ).read_bytes()
+
+    assert result.stdout.strip() == "agent-comm 0.1.0"
+
+
+def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
+    launcher = ROOT / "scripts" / "agent-comm"
+    fake_python = tmp_path / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env sh\n"
+        "case \"$1\" in\n"
+        "  -c) exit 1 ;;\n"
+        "  *) echo 'unsupported python should not run agent_comm' >&2; exit 42 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    result = subprocess.run(
+        [str(launcher), "--version"],
+        cwd=tmp_path,
+        env={**os.environ, "PYTHON_BIN": str(fake_python)},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert result.returncode == 127
+    assert result.stdout == ""
+    assert "requires Python 3.12 or newer" in result.stderr
+    assert "unsupported python should not run agent_comm" not in result.stderr
 
 
 def test_examples_exist_as_markdown_message_bodies():

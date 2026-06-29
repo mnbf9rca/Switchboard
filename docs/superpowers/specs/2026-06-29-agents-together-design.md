@@ -267,11 +267,12 @@ During package development, commands may be run with `uv run agent-comm ...`. Ag
 
 Runtime command resolution:
 
-1. Prefer installed `agent-comm` on `PATH`; verify with `agent-comm --version`.
-2. If installed into the active Python environment, try `python3 -m agent_comm`, then `python -m agent_comm`.
-3. On Windows, try `py -3.12 -m agent_comm` when available.
-4. In a development checkout only, use `uv run agent-comm`.
-5. If none work, stop with setup instructions.
+1. If the skill is loaded from an installed Codex plugin, locate the nearest ancestor containing `.codex-plugin/plugin.json` and use `<plugin-root>/scripts/agent-comm`.
+2. Prefer installed `agent-comm` on `PATH`; verify with `agent-comm --version`.
+3. If installed into the active Python environment, try `python3.12 -m agent_comm`, then `python3 -m agent_comm`, then `python -m agent_comm`.
+4. On Windows, try `py -3.12 -m agent_comm` when available.
+5. In a development checkout only, use `uv run agent-comm`.
+6. If none work, stop with setup instructions.
 
 Commands:
 
