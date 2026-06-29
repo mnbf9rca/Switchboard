@@ -54,6 +54,12 @@ class Artifact:
     created_at: str
 
 
+@dataclass(frozen=True)
+class ReplyLink:
+    message_id: str
+    reply_to_message_id: str
+
+
 class Repository:
     def __init__(self, bus_path: str | Path):
         self.bus_path = Path(bus_path)
@@ -131,6 +137,54 @@ class Repository:
                 (thread_id,),
             )
         return _thread(row)
+
+    def messages_for_thread(self, thread_id: str) -> list[Message]:
+        with self._connection() as db:
+            self._require_thread(db, thread_id)
+            rows = db.execute(
+                """
+                select id, thread_id, seq, from_agent, to_agent, subject,
+                       body_md, created_at, acked_at
+                from messages
+                where thread_id = ?
+                order by seq, id
+                """,
+                (thread_id,),
+            ).fetchall()
+        return [_message(row) for row in rows]
+
+    def unread_messages_for_thread(self, thread_id: str) -> list[Message]:
+        with self._connection() as db:
+            self._require_thread(db, thread_id)
+            rows = db.execute(
+                """
+                select id, thread_id, seq, from_agent, to_agent, subject,
+                       body_md, created_at, acked_at
+                from messages
+                where thread_id = ? and acked_at is null
+                order by seq, id
+                """,
+                (thread_id,),
+            ).fetchall()
+        return [_message(row) for row in rows]
+
+    def reply_links_for_thread(self, thread_id: str) -> list[ReplyLink]:
+        with self._connection() as db:
+            self._require_thread(db, thread_id)
+            rows = db.execute(
+                """
+                select r.message_id, r.reply_to_message_id
+                from message_replies r
+                join messages m on m.id = r.message_id
+                where m.thread_id = ?
+                order by m.seq, r.reply_to_message_id
+                """,
+                (thread_id,),
+            ).fetchall()
+        return [
+            ReplyLink(row["message_id"], row["reply_to_message_id"])
+            for row in rows
+        ]
 
     def post_message(
         self,
@@ -317,6 +371,20 @@ class Repository:
                 order by created_at, id
                 """,
                 (message_id,),
+            ).fetchall()
+        return [_artifact(row) for row in rows]
+
+    def artifacts_for_thread(self, thread_id: str) -> list[Artifact]:
+        with self._connection() as db:
+            self._require_thread(db, thread_id)
+            rows = db.execute(
+                """
+                select id, thread_id, message_id, path, git_ref, description, created_at
+                from artifacts
+                where thread_id = ?
+                order by created_at, id
+                """,
+                (thread_id,),
             ).fetchall()
         return [_artifact(row) for row in rows]
 

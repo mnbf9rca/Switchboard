@@ -30,11 +30,12 @@ def test_local_sqlite_bus_artifacts_are_ignored():
     assert ".agent-comm/" in ignored_patterns
 
 
-def test_placeholder_commands_fail_explicitly(run_cli):
+def test_implemented_commands_without_required_arguments_show_usage(run_cli):
     result = run_cli("status")
     assert result.returncode != 0
-    assert "ERR_NOT_IMPLEMENTED" in result.stdout
-    assert "status" in result.stdout
+    assert "ERR_NOT_IMPLEMENTED" not in result.stdout
+    assert "usage:" in result.stderr
+    assert "--thread" in result.stderr
 
 
 def test_migrate_uses_spec_required_error(run_cli):

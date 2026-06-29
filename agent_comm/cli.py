@@ -10,8 +10,9 @@ from . import __version__
 from .backup import backup_bus, restore_bus
 from .db import BusError, UnsupportedSchemaVersion, initialize_bus
 from .doctor import core_health
+from .export import load_thread_records, write_thread_export
 from .paths import BusResolutionError, resolve_bus_path
-from .repository import Artifact, Message, Repository, Thread
+from .repository import Artifact, Message, Repository, ReplyLink, Thread
 
 POLL_INTERVAL_SECONDS = 1.0
 
@@ -109,6 +110,14 @@ def build_parser() -> argparse.ArgumentParser:
             add.add_argument("--git-ref")
             add.add_argument("--description")
             add.set_defaults(handler=_handle_artifact_add)
+        elif command == "status":
+            subparser.add_argument("--thread", required=True)
+            subparser.set_defaults(handler=_handle_status)
+        elif command == "export":
+            subparser.add_argument("--thread", required=True)
+            subparser.add_argument("--redacted", action="store_true")
+            subparser.add_argument("--bodyless", action="store_true")
+            subparser.set_defaults(handler=_handle_export)
         else:
             subparser.set_defaults(handler=_handle_placeholder)
 
@@ -280,6 +289,38 @@ def _handle_artifact_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_status(args: argparse.Namespace) -> int:
+    try:
+        records = load_thread_records(_repo(args), args.thread)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+    _print_status(
+        records.thread,
+        records.unread_messages,
+        records.messages,
+        records.reply_links,
+        records.artifacts,
+    )
+    return 0
+
+
+def _handle_export(args: argparse.Namespace) -> int:
+    try:
+        repo = _repo(args)
+        records = load_thread_records(repo, args.thread)
+        output_path = write_thread_export(
+            _bus_path(args),
+            records,
+            include_bodies=not (args.redacted or args.bodyless),
+        )
+    except OSError as exc:
+        return _print_error(exc)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+    print(f"export: {output_path}")
+    return 0
+
+
 def _handle_migrate(_args: argparse.Namespace) -> int:
     message = "ERR_NOT_IMPLEMENTED: migrate is not implemented yet"
     print(message)
@@ -400,6 +441,60 @@ def _print_artifacts(artifacts: list[Artifact]) -> None:
         print(f"  git_ref: {artifact.git_ref or ''}")
         print(f"  description: {artifact.description or ''}")
         print(f"  created_at: {artifact.created_at}")
+
+
+def _print_status(
+    thread: Thread,
+    unread_messages: list[Message],
+    recent_messages: list[Message],
+    reply_links: list[ReplyLink],
+    artifacts: list[Artifact],
+) -> None:
+    _print_thread(thread)
+    print()
+    print("unread_messages:")
+    if unread_messages:
+        for message in unread_messages:
+            _print_status_message_item(message)
+    else:
+        print("- none")
+    print()
+    print("recent_messages:")
+    if recent_messages:
+        for message in recent_messages:
+            _print_status_message_item(message)
+    else:
+        print("- none")
+    print()
+    print("reply_links:")
+    if reply_links:
+        for link in reply_links:
+            print(f"- message: {link.message_id}")
+            print(f"  replies_to: {link.reply_to_message_id}")
+    else:
+        print("- none")
+    print()
+    print("artifacts:")
+    if artifacts:
+        for artifact in artifacts:
+            print(f"- artifact: {artifact.id}")
+            print(f"  message: {artifact.message_id or ''}")
+            print(f"  path: {artifact.path or ''}")
+            print(f"  git_ref: {artifact.git_ref or ''}")
+            print(f"  description: {artifact.description or ''}")
+            print(f"  created_at: {artifact.created_at}")
+    else:
+        print("- none")
+
+
+def _print_status_message_item(message: Message) -> None:
+    print(f"- message: {message.id}")
+    print(f"  seq: {message.seq}")
+    print(f"  from: {message.from_agent}")
+    print(f"  to: {message.to_agent}")
+    print(f"  subject: {message.subject}")
+    print(f"  created_at: {message.created_at}")
+    print(f"  acked_at: {message.acked_at or ''}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

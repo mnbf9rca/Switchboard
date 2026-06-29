@@ -191,3 +191,242 @@ def test_doctor_rejects_garbage_database_without_traceback(run_cli, temp_bus):
     assert result.returncode != 0
     assert "valid sqlite" in result.stderr.lower()
     assert "Traceback" not in result.stderr
+
+
+def test_status_reports_stored_thread_records_without_workflow_inference(
+    run_cli, temp_bus, tmp_path
+):
+    body_one = tmp_path / "one.md"
+    body_one.write_text("first body\n", encoding="utf-8")
+    body_two = tmp_path / "two.md"
+    body_two.write_text("second body\n", encoding="utf-8")
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Status Thread",
+        ).stdout,
+        "thread",
+    )
+    first_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "planner",
+            "--to",
+            "implementer",
+            "--subject",
+            "Ready for review",
+            "--body-file",
+            str(body_one),
+        ).stdout,
+        "message",
+    )
+    second_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "implementer",
+            "--to",
+            "planner",
+            "--subject",
+            "Reply",
+            "--body-file",
+            str(body_two),
+            "--reply-to",
+            first_id,
+        ).stdout,
+        "message",
+    )
+    ack_first = run_cli("--bus", str(temp_bus), "ack", first_id, "--agent", "implementer")
+    assert ack_first.returncode == 0, ack_first.stderr
+    artifact_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "artifact",
+            "add",
+            "--thread",
+            thread_id,
+            "--message",
+            second_id,
+            "--path",
+            "docs/status.md",
+            "--git-ref",
+            "abc123",
+            "--description",
+            "status doc",
+        ).stdout,
+        "artifact",
+    )
+
+    result = run_cli("--bus", str(temp_bus), "status", "--thread", thread_id)
+
+    assert result.returncode == 0, result.stderr
+    output = result.stdout
+    assert f"thread: {thread_id}" in output
+    assert "project: demo" in output
+    assert "title: Status Thread" in output
+    assert "unread_messages:" in output
+    assert f"message: {second_id}" in output
+    assert "recent_messages:" in output
+    assert "seq: 1" in output
+    assert "seq: 2" in output
+    assert "reply_links:" in output
+    assert f"message: {second_id}" in output
+    assert f"replies_to: {first_id}" in output
+    assert "artifacts:" in output
+    assert artifact_id in output
+    assert "docs/status.md" in output
+    assert "Ready for review" in output
+    for forbidden_label in (
+        "owner:",
+        "complete:",
+        "accepted:",
+        "lifecycle:",
+        "category:",
+        "claim:",
+        "workflow:",
+        "stale:",
+    ):
+        assert forbidden_label not in output.lower()
+
+
+def test_export_writes_thread_markdown_with_redacted_metadata(run_cli, temp_bus, tmp_path):
+    body = tmp_path / "body.md"
+    body.write_text("secret implementation details\n```nested fence\n", encoding="utf-8")
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Export Thread",
+        ).stdout,
+        "thread",
+    )
+    message_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "planner",
+            "--to",
+            "implementer",
+            "--subject",
+            "Export",
+            "--body-file",
+            str(body),
+        ).stdout,
+        "message",
+    )
+    ack = run_cli("--bus", str(temp_bus), "ack", message_id, "--agent", "implementer")
+    assert ack.returncode == 0, ack.stderr
+    acked_at = _field(ack.stdout, "acked_at")
+    artifact_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "artifact",
+            "add",
+            "--thread",
+            thread_id,
+            "--message",
+            message_id,
+            "--path",
+            "build/result.txt",
+            "--description",
+            "result file",
+        ).stdout,
+        "artifact",
+    )
+
+    result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "export",
+        "--thread",
+        thread_id,
+        "--redacted",
+    )
+
+    assert result.returncode == 0, result.stderr
+    export_path = temp_bus.parent / "exports" / f"{thread_id}.md"
+    assert f"export: {export_path}" in result.stdout
+    exported = export_path.read_text(encoding="utf-8")
+    assert f"# Export Thread ({thread_id})" in exported
+    assert f"- project: demo" in exported
+    assert f"- message: {message_id}" in exported
+    assert "- seq: 1" in exported
+    assert "- from: planner" in exported
+    assert "- to: implementer" in exported
+    assert "- subject: Export" in exported
+    assert f"- acked_at: {acked_at}" in exported
+    assert "- body: omitted" in exported
+    assert "secret implementation details" not in exported
+    assert "## Unread Messages" in exported
+    assert "No unread messages." in exported
+    assert "## Recent Messages" in exported
+    assert "## Reply References" in exported
+    assert "No reply references." in exported
+    assert artifact_id in exported
+    assert "build/result.txt" in exported
+    assert not list(export_path.parent.glob(f".{thread_id}.md.tmp.*"))
+
+    full = run_cli("--bus", str(temp_bus), "export", "--thread", thread_id)
+    assert full.returncode == 0, full.stderr
+    exported_full = export_path.read_text(encoding="utf-8")
+    assert "secret implementation details" in exported_full
+    assert "````markdown\nsecret implementation details\n```nested fence\n````" in exported_full
+
+
+def test_status_and_export_do_not_create_missing_bus(run_cli, tmp_path):
+    missing_bus = tmp_path / "missing.sqlite"
+
+    status = run_cli(
+        "--bus",
+        str(missing_bus),
+        "status",
+        "--thread",
+        "thread_missing",
+    )
+    export = run_cli(
+        "--bus",
+        str(missing_bus),
+        "export",
+        "--thread",
+        "thread_missing",
+    )
+
+    assert status.returncode != 0
+    assert export.returncode != 0
+    assert "does not exist" in status.stderr
+    assert "does not exist" in export.stderr
+    assert not missing_bus.exists()
+
+
+def _field(output: str, name: str) -> str:
+    prefix = f"{name}: "
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix) :]
+    raise AssertionError(f"missing {name!r} in output:\n{output}")
