@@ -23,11 +23,13 @@ Use the first command form that works. Runtime instructions should prefer the pl
 
 ## Implementer Workflow
 
-At the start of work, ensure `agent-comm` is available, then resolve or initialize the bus for the current project. Read your inbox before acting.
+At the start of work, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. If the shared user-local mailbox is blocked by sandbox permissions, ask the user before using a repo-local mailbox. Read your inbox before acting.
 
-Show the full message body before acknowledging it. Acknowledge only after reading the message and any linked artifacts. Use artifact links as the durable source for plans, logs, review notes, and other larger context.
+Choose `<implementer-id>` to include role and worktree, such as `implementer-feature-a`. Use `agent-comm next --as <implementer-id>` to read the next unread message.
 
-Work in the thread selected by the planner or start a focused thread if you need to initiate coordination. Keep replies in that thread with repeated `--reply-to` use.
+Read the full message body and any linked artifacts before acting. Use `agent-comm reply <message-id> --as <implementer-id> "message"` to answer; reply automatically acknowledges the message. Use `agent-comm ack --as <implementer-id> <message-id>` only when you read without replying. Use artifact links as the durable source for plans, logs, review notes, and other larger context.
+
+Work in the thread selected by the planner or start a focused thread if you need to initiate coordination.
 
 Send questions, blockers, and ready-for-review notes as deliberate addressed messages. Include the requested action, what you tried, relevant artifact links, and the specific decision or review you need. Do not rely on chat history as the handoff record.
 

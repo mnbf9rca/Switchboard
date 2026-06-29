@@ -141,10 +141,51 @@ def test_protocol_guides_agent_communication_not_cli_help():
     ):
         assert guidance in protocol
 
+    for guidance in (
+        "agent-comm send --as",
+        "agent-comm reply <message-id> --as",
+        "agent-comm next --as",
+        "Use ack explicitly when you read without replying",
+    ):
+        assert guidance in protocol
+
     command_appendix = protocol.split("## Minimal Command Appendix", 1)[1]
     before_appendix = protocol.split("## Minimal Command Appendix", 1)[0]
     assert before_appendix.count("agent-comm ") == 0
     assert command_appendix.count("agent-comm ") <= 14
+
+    for old_command in (
+        "agent-comm register",
+        "agent-comm start-thread",
+        "agent-comm post",
+        "--body-file <path>",
+    ):
+        assert old_command not in command_appendix
+
+    planner_skill = (ROOT / "skills" / "coordinate-as-planner" / "SKILL.md").read_text()
+    implementer_skill = (
+        ROOT / "skills" / "coordinate-as-implementer" / "SKILL.md"
+    ).read_text()
+
+    for required in (
+        "Do not inspect CLI help before using the normal workflow",
+        "include role and worktree",
+        "ask the user before using a repo-local mailbox",
+    ):
+        assert required in planner_skill
+        assert required in implementer_skill
+
+    for required in (
+        "Use `--artifact PATH` only when durable project context belongs in a file",
+        "Use `--wait` only when blocked on the reply",
+    ):
+        assert required in planner_skill
+
+    for required in (
+        "reply automatically acknowledges",
+        "Use `agent-comm ack --as",
+    ):
+        assert required in implementer_skill
 
 
 def test_plugin_manifests_expose_skills_as_harness_adapters():

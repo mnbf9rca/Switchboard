@@ -12,6 +12,12 @@ Every message should be addressed, intentional, and useful on its own. A reader 
 
 Agent ids are explicit collaboration handles, not global user identities. Include the worktree name or branch in your agent id when multiple agents may work in different worktrees of the same project, for example `planner-main`, `implementer-feature-a`, or `reviewer-bugfix-123`. This keeps shared-mailbox messages readable without requiring the bus to understand worktree state.
 
+Normal use does not require `--project` or `--bus`; the CLI derives a shared project mailbox. If sandbox permissions block that shared mailbox, ask the user before using a repo-local mailbox.
+
+Each agent identity should include role and worktree when multiple worktrees are active, such as `planner-main` or `implementer-feature-a`.
+
+Do not inspect CLI help before using this normal workflow; use help only after a command fails.
+
 ## What To Include
 
 Use short Markdown bodies. Prefer this shape when it fits:
@@ -38,7 +44,7 @@ As implementer, read your inbox before starting work and at meaningful boundarie
 
 Ask a question when you cannot proceed safely from the handoff and repository artifacts. Report a blocker when you tried the expected path and need a decision or intervention. Send ready-for-review only when the requested work is in the repository and the verification evidence is available in a linked artifact or concise message body.
 
-Replies should stay in the same thread and point back to the message being answered. If you answer several prior messages at once, link each relevant prior message as a reply target.
+Replies should stay in the same thread and point back to the message being answered. If you answer several prior messages at once, link each relevant prior message as a reply target. Use ack explicitly when you read without replying. Reply automatically acknowledges the message being answered.
 
 ## Threads, Replies, and Artifacts
 
@@ -61,18 +67,15 @@ If mailbox messages, repository artifacts, and current user direction disagree, 
 Use the command form discovered by the skill. Replace `agent-comm` with `python -m agent_comm` when that is the working runtime.
 
 ```sh
-agent-comm init --project <project-id>
-agent-comm register --agent <agent-id> --role <role> --harness <harness>
-agent-comm start-thread --project <project-id> --title "<title>"
-agent-comm post --thread <thread-id> --from <sender> --to <recipient> --subject "<subject>" --body-file <path>
-agent-comm post --thread <thread-id> --from <sender> --to <recipient> --subject "<subject>" --body-file <path> --reply-to <message-id>
-agent-comm inbox --agent <agent-id>
+agent-comm send --as <sender-id> --to <recipient-id> "short message"
+agent-comm send --as <sender-id> --to <recipient-id> --title "<title>" "short message"
+agent-comm send --as <sender-id> --to <recipient-id> --artifact <path> "short message"
+agent-comm send --as <sender-id> --to <recipient-id> --in-thread <thread-id> "short message"
+agent-comm reply <message-id> --as <sender-id> "short reply"
+agent-comm next --as <agent-id>
+agent-comm inbox --as <agent-id>
 agent-comm show <message-id>
-agent-comm ack <message-id> --agent <agent-id>
-agent-comm wait --agent <agent-id>
-agent-comm wait --agent <agent-id> --follow
-agent-comm artifact add --thread <thread-id> --message <message-id> --path <project-relative-path> --description "<why this matters>"
-agent-comm doctor
-agent-comm backup --out <path>
-agent-comm restore --from <path>
+agent-comm ack --as <agent-id> <message-id>
+agent-comm wait --as <agent-id>
+agent-comm wait --as <agent-id> --follow
 ```

@@ -23,13 +23,15 @@ Use the first command form that works. Runtime instructions should prefer the pl
 
 ## Planner Workflow
 
-At the start of coordination, ensure `agent-comm` is available, then resolve or initialize the bus for the current project. Check your inbox before sending new instructions so you do not miss prior replies.
+At the start of coordination, ensure `agent-comm` is available. Do not inspect CLI help before using the normal workflow; use help only after a command fails. If the shared user-local mailbox is blocked by sandbox permissions, ask the user before using a repo-local mailbox. Check your inbox before sending new instructions so you do not miss prior replies.
 
-Start or select a thread for the work. Use a dedicated thread for each coherent task or review stream, and keep replies in that thread with repeated `--reply-to` use. Do not rely on chat history as the handoff record.
+Choose `<planner-id>` to include role and worktree, such as `planner-main`. Use a dedicated thread for each coherent task or review stream when continuing existing coordination. Do not rely on chat history as the handoff record.
+
+Use `agent-comm send --as <planner-id> --to <agent-id> "message"` for short messages. Use `--artifact PATH` only when durable project context belongs in a file. Use `--wait` only when blocked on the reply.
 
 Create project-native handoff artifacts when they make the implementation clearer: plans, review notes, test logs, diffs, or other files that belong in the repository. Add artifact links to the mailbox message instead of pasting large context.
 
-Post deliberate addressed messages to implementers. State the requested action, relevant constraints, artifact links, and what kind of reply is useful. Read replies with inbox and show, then acknowledge messages after reading.
+Send deliberate addressed messages to implementers. State the requested action, relevant constraints, artifact links, and what kind of reply is useful. Read replies with inbox or next, then acknowledge messages after reading when you are not replying.
 
 Check your inbox at the start of work, at coordination boundaries, before review decisions, and at final coordination points. Answer implementation questions in the thread. If a conflict appears between mailbox messages, repository artifacts, and current user direction, stop and ask for clarification.
 
