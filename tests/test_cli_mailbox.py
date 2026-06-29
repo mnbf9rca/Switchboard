@@ -618,6 +618,43 @@ def test_send_prints_agent_created_only_for_new_agents(run_cli, temp_bus):
     assert "agent_created:" not in second.stdout
 
 
+def test_send_preserves_existing_agent_metadata(run_cli, temp_bus):
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    register = run_cli(
+        "--bus",
+        str(temp_bus),
+        "register",
+        "--agent",
+        "planner-main",
+        "--display-name",
+        "Planning Agent",
+        "--harness",
+        "codex",
+        "--role",
+        "lead",
+    )
+    assert register.returncode == 0, register.stderr
+
+    result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "Do not clear metadata.",
+    )
+
+    assert result.returncode == 0, result.stderr
+    planner = _row(temp_bus, "agents", "planner-main")
+    assert planner["display_name"] == "Planning Agent"
+    assert planner["harness"] == "codex"
+    assert planner["role"] == "lead"
+    assert "agent_created: planner-main" not in result.stdout
+    assert "agent_created: implementer-feature-a" in result.stdout
+
+
 def _field(output: str, name: str) -> str:
     prefix = f"{name}: "
     for line in output.splitlines():

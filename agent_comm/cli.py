@@ -438,11 +438,10 @@ def _read_body(args: argparse.Namespace) -> str:
 def _ensure_agent(repo: Repository, agent_id: str) -> bool:
     try:
         repo.get_agent(agent_id)
-        created = False
+        return False
     except ValueError:
-        created = True
-    repo.register_agent(agent_id)
-    return created
+        repo.register_agent(agent_id)
+        return True
 
 
 def _attach_artifacts(
