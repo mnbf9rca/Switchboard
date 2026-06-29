@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-PROTOCOL_RELATIVE_PATH = Path("references") / "agent-communication-protocol.md"
+PROTOCOL_RELATIVE_PATH = Path("references") / "switchboard-protocol.md"
 
 
 class SkillProtocolValidationError(ValueError):
@@ -40,7 +40,7 @@ def validate_skill_protocols(root: Path | str = ".") -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate duplicated agent-comm skill protocol references."
+        description="Validate duplicated Switchboard skill protocol references."
     )
     parser.add_argument(
         "root",

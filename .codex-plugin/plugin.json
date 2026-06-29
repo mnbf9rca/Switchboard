@@ -1,16 +1,16 @@
 {
-  "name": "agents-together",
-  "version": "0.1.1",
-  "description": "Durable local coordination workflows for independent coding agents",
+  "name": "switchboard",
+  "version": "0.2.0",
+  "description": "A local mailbox for deliberate agent coordination",
   "author": {
-    "name": "agents-together"
+    "name": "switchboard"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "Agents Together",
-    "shortDescription": "Durable local coordination workflows for independent coding agents",
-    "longDescription": "Coordinate planner and implementer agents through local Agent Skills and the agent-comm mailbox.",
-    "developerName": "agents-together",
+    "displayName": "Switchboard",
+    "shortDescription": "A local mailbox for deliberate agent coordination",
+    "longDescription": "Coordinate planner and implementer agents through local Agent Skills and the Switchboard mailbox.",
+    "developerName": "switchboard",
     "category": "Productivity",
     "capabilities": [
       "Skills"

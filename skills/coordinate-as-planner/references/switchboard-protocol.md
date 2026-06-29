@@ -1,6 +1,6 @@
-# Agent Communication Protocol
+# Switchboard Protocol
 
-`agent-comm` is a durable mailbox for deliberate coordination between independent agents. It is not a progress log, memory system, task tracker, or workflow engine. Use it to cross an agent boundary: one agent needs another agent to read, decide, answer, review, or accept something.
+`switchboard` is a durable mailbox for deliberate coordination between independent agents. It is not a progress log, memory system, task tracker, or workflow engine. Use it to cross an agent boundary: one agent needs another agent to read, decide, answer, review, or accept something.
 
 ## Communication Principles
 
@@ -10,7 +10,7 @@ Do not send routine progress updates, private scratch notes, command transcripts
 
 Every message should be addressed, intentional, and useful on its own. A reader should be able to understand who needs to do what, why now, where the durable context lives, and what kind of reply closes the loop.
 
-Agent ids are explicit collaboration handles, not global user identities. Include the worktree name or branch in your agent id when multiple agents may work in different worktrees of the same project, for example `planner-main`, `implementer-feature-a`, or `reviewer-bugfix-123`. This keeps shared-mailbox messages readable without requiring the bus to understand worktree state.
+Agent ids are explicit collaboration handles, not global user identities. Include the worktree name or branch in your agent id when multiple agents may work in different worktrees of the same project, for example `planner-main`, `implementer-feature-a`, or `reviewer-bugfix-123`. This keeps shared-mailbox messages readable without requiring the mailbox to understand worktree state.
 
 Normal use does not require `--project` or `--bus`; the CLI derives a shared project mailbox. Do not use a repo-local mailbox. If sandbox permissions block the shared mailbox, stop and request permission for the shared mailbox instead.
 
@@ -69,15 +69,15 @@ If mailbox messages, repository artifacts, and current user direction disagree, 
 Use the command form discovered by the skill. Do not substitute an unsupported Python runtime.
 
 ```sh
-agent-comm send --as <sender-id> --to <recipient-id> "short message"
-agent-comm send --as <sender-id> --to <recipient-id> --title "<title>" "short message"
-agent-comm send --as <sender-id> --to <recipient-id> --artifact <path> "short message"
-agent-comm send --as <sender-id> --to <recipient-id> --in-thread <thread-id> "short message"
-agent-comm reply <message-id> --as <sender-id> "short reply"
-agent-comm next --as <agent-id>
-agent-comm inbox --as <agent-id>
-agent-comm show <message-id>
-agent-comm ack --as <agent-id> <message-id>
-agent-comm wait --as <agent-id>
-agent-comm wait --as <agent-id> --follow
+switchboard send --as <sender-id> --to <recipient-id> "short message"
+switchboard send --as <sender-id> --to <recipient-id> --title "<title>" "short message"
+switchboard send --as <sender-id> --to <recipient-id> --artifact <path> "short message"
+switchboard send --as <sender-id> --to <recipient-id> --in-thread <thread-id> "short message"
+switchboard reply <message-id> --as <sender-id> "short reply"
+switchboard next --as <agent-id>
+switchboard inbox --as <agent-id>
+switchboard show <message-id>
+switchboard ack --as <agent-id> <message-id>
+switchboard wait --as <agent-id>
+switchboard wait --as <agent-id> --follow
 ```

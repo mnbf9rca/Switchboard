@@ -6,7 +6,7 @@ Context: Task 8 adds the skill and plugin layer for the local mailbox project. K
 
 Relevant artifacts:
 
-- `docs/superpowers/plans/2026-06-29-agents-together.md`
+- `docs/superpowers/plans/2026-06-29-switchboard.md`
 - `tests/test_skills_manifests_examples.py`
 
 Constraints for this handoff:

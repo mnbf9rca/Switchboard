@@ -1,1 +1,1 @@
-{"name":"agents-together","version":"0.1.1","description":"Durable local coordination workflows for independent coding agents","skills":"./skills/"}
+{"name":"switchboard","version":"0.2.0","description":"A local mailbox for deliberate agent coordination","skills":"./skills/"}

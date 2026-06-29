@@ -1,14 +1,14 @@
 {
-  "name": "agents-together-local",
+  "name": "switchboard-local",
   "interface": {
-    "displayName": "Agents Together Local"
+    "displayName": "Switchboard Local"
   },
   "plugins": [
     {
-      "name": "agents-together",
+      "name": "switchboard",
       "source": {
         "source": "local",
-        "path": "./plugins/agents-together"
+        "path": "./plugins/switchboard"
       },
       "policy": {
         "installation": "AVAILABLE",
