@@ -307,6 +307,19 @@ class Repository:
                 raise
         return Artifact(artifact_id, thread_id, message_id, path, git_ref, description, now)
 
+    def artifacts_for_message(self, message_id: str) -> list[Artifact]:
+        with self._connection() as db:
+            rows = db.execute(
+                """
+                select id, thread_id, message_id, path, git_ref, description, created_at
+                from artifacts
+                where message_id = ?
+                order by created_at, id
+                """,
+                (message_id,),
+            ).fetchall()
+        return [_artifact(row) for row in rows]
+
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
         db = self._connect()
@@ -401,4 +414,16 @@ def _message(row: sqlite3.Row) -> Message:
         row["body_md"],
         row["created_at"],
         row["acked_at"],
+    )
+
+
+def _artifact(row: sqlite3.Row) -> Artifact:
+    return Artifact(
+        row["id"],
+        row["thread_id"],
+        row["message_id"],
+        row["path"],
+        row["git_ref"],
+        row["description"],
+        row["created_at"],
     )

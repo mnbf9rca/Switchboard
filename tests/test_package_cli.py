@@ -31,10 +31,10 @@ def test_local_sqlite_bus_artifacts_are_ignored():
 
 
 def test_placeholder_commands_fail_explicitly(run_cli):
-    result = run_cli("register")
+    result = run_cli("backup")
     assert result.returncode != 0
     assert "ERR_NOT_IMPLEMENTED" in result.stdout
-    assert "register" in result.stdout
+    assert "backup" in result.stdout
 
 
 def test_migrate_uses_spec_required_error(run_cli):

@@ -1,0 +1,426 @@
+from __future__ import annotations
+
+import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from conftest import _agent_comm_script
+
+
+def test_register_start_thread_and_post_round_trip(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body = "First line\r\n\r\n- keep markdown exactly\r\n"
+    body_file.write_bytes(body.encode("utf-8"))
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "bootstrap").returncode == 0
+    register = run_cli(
+        "--bus",
+        str(temp_bus),
+        "register",
+        "--agent",
+        "planner",
+        "--display-name",
+        "Planning Agent",
+        "--harness",
+        "codex",
+        "--role",
+        "lead",
+    )
+    assert register.returncode == 0
+    assert "planner" in register.stdout
+
+    thread = run_cli(
+        "--bus",
+        str(temp_bus),
+        "start-thread",
+        "--project",
+        "demo-project",
+        "--title",
+        "Handoff",
+    )
+    assert thread.returncode == 0
+    thread_id = _field(thread.stdout, "thread")
+
+    post = run_cli(
+        "--bus",
+        str(temp_bus),
+        "post",
+        "--thread",
+        thread_id,
+        "--from",
+        "planner",
+        "--to",
+        "implementer",
+        "--subject",
+        "Build it",
+        "--body-file",
+        str(body_file),
+    )
+    assert post.returncode == 0
+    message_id = _field(post.stdout, "message")
+
+    with sqlite3.connect(temp_bus) as db:
+        db.row_factory = sqlite3.Row
+        saved_thread = db.execute("select * from threads where id = ?", (thread_id,)).fetchone()
+        saved_message = db.execute("select * from messages where id = ?", (message_id,)).fetchone()
+
+    assert saved_thread["project_id"] == "demo-project"
+    assert saved_message["body_md"].encode("utf-8") == body_file.read_bytes()
+    assert saved_message["subject"] == "Build it"
+
+
+def test_implemented_commands_use_usage_errors(run_cli, temp_bus):
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+
+    register = run_cli("--bus", str(temp_bus), "register")
+    assert register.returncode != 0
+    assert "ERR_NOT_IMPLEMENTED" not in register.stdout
+    assert "--agent" in register.stderr
+
+    artifact = run_cli("--bus", str(temp_bus), "artifact")
+    assert artifact.returncode != 0
+    assert "usage:" in artifact.stderr
+
+
+def test_repeated_reply_to_flags_are_stored(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_text("reply body")
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Thread",
+        ).stdout,
+        "thread",
+    )
+    first_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "a",
+            "--to",
+            "b",
+            "--subject",
+            "One",
+            "--body-file",
+            str(body_file),
+        ).stdout,
+        "message",
+    )
+    second_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "b",
+            "--to",
+            "a",
+            "--subject",
+            "Two",
+            "--body-file",
+            str(body_file),
+            "--reply-to",
+            first_id,
+            "--reply-to",
+            first_id,
+        ).stdout,
+        "message",
+    )
+
+    with sqlite3.connect(temp_bus) as db:
+        rows = db.execute(
+            "select message_id, reply_to_message_id from message_replies"
+        ).fetchall()
+
+    assert rows == [(second_id, first_id)]
+
+
+def test_post_rejects_non_utf8_body_file_without_traceback(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_bytes(b"\xff")
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Thread",
+        ).stdout,
+        "thread",
+    )
+
+    result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "post",
+        "--thread",
+        thread_id,
+        "--from",
+        "a",
+        "--to",
+        "b",
+        "--subject",
+        "Invalid body",
+        "--body-file",
+        str(body_file),
+    )
+
+    assert result.returncode != 0
+    assert "ERROR:" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_inbox_show_ack_and_wait_do_not_auto_ack(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_text("body for inbox\n")
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Inbox",
+        ).stdout,
+        "thread",
+    )
+    message_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "planner",
+            "--to",
+            "implementer",
+            "--subject",
+            "Unread",
+            "--body-file",
+            str(body_file),
+        ).stdout,
+        "message",
+    )
+
+    inbox = run_cli("--bus", str(temp_bus), "inbox", "--agent", "implementer")
+    assert inbox.returncode == 0
+    assert message_id in inbox.stdout
+    assert "Unread" in inbox.stdout
+
+    wait = run_cli("--bus", str(temp_bus), "wait", "--agent", "implementer", "--timeout", "0")
+    assert wait.returncode == 0
+    assert message_id in wait.stdout
+    assert _acked_at(temp_bus, message_id) is None
+
+    show = run_cli("--bus", str(temp_bus), "show", message_id)
+    assert show.returncode == 0
+    assert "body for inbox\n" in show.stdout
+
+    wrong_ack = run_cli("--bus", str(temp_bus), "ack", message_id, "--agent", "planner")
+    assert wrong_ack.returncode != 0
+    assert "recipient" in wrong_ack.stderr
+
+    ack = run_cli("--bus", str(temp_bus), "ack", message_id, "--agent", "implementer")
+    assert ack.returncode == 0
+    assert _acked_at(temp_bus, message_id) is not None
+    assert message_id not in run_cli("--bus", str(temp_bus), "inbox", "--agent", "implementer").stdout
+
+
+def test_wait_timeout_reports_failure(run_cli, temp_bus):
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+
+    result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "wait",
+        "--agent",
+        "implementer",
+        "--timeout",
+        "0",
+    )
+
+    assert result.returncode != 0
+    assert "timed out" in result.stderr
+
+
+def test_wait_follow_polls_until_message_arrives(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_text("late body")
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Wait",
+        ).stdout,
+        "thread",
+    )
+
+    wait_process = subprocess.Popen(
+        [
+            str(_agent_comm_script(Path(sys.executable))),
+            "--bus",
+            str(temp_bus),
+            "wait",
+            "--agent",
+            "implementer",
+            "-f",
+            "--timeout",
+            "2",
+        ],
+        cwd=tmp_path,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        time.sleep(0.2)
+        post = run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "planner",
+            "--to",
+            "implementer",
+            "--subject",
+            "Late",
+            "--body-file",
+            str(body_file),
+        )
+        assert post.returncode == 0
+        message_id = _field(post.stdout, "message")
+        stdout, stderr = wait_process.communicate(timeout=3)
+    finally:
+        if wait_process.poll() is None:
+            wait_process.terminate()
+
+    assert wait_process.returncode == 0, stderr
+    assert message_id in stdout
+    assert _acked_at(temp_bus, message_id) is None
+
+
+def test_artifact_add_links_thread_and_optional_message(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_text("body")
+
+    assert run_cli("--bus", str(temp_bus), "init", "--project", "demo").returncode == 0
+    thread_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "start-thread",
+            "--project",
+            "demo",
+            "--title",
+            "Artifacts",
+        ).stdout,
+        "thread",
+    )
+    message_id = _field(
+        run_cli(
+            "--bus",
+            str(temp_bus),
+            "post",
+            "--thread",
+            thread_id,
+            "--from",
+            "planner",
+            "--to",
+            "implementer",
+            "--subject",
+            "Artifact",
+            "--body-file",
+            str(body_file),
+        ).stdout,
+        "message",
+    )
+
+    artifact = run_cli(
+        "--bus",
+        str(temp_bus),
+        "artifact",
+        "add",
+        "--thread",
+        thread_id,
+        "--message",
+        message_id,
+        "--path",
+        "docs/handoff.md",
+        "--git-ref",
+        "abc123",
+        "--description",
+        "handoff document",
+    )
+    assert artifact.returncode == 0
+    artifact_id = _field(artifact.stdout, "artifact")
+
+    with sqlite3.connect(temp_bus) as db:
+        db.row_factory = sqlite3.Row
+        row = db.execute("select * from artifacts where id = ?", (artifact_id,)).fetchone()
+
+    assert row["thread_id"] == thread_id
+    assert row["message_id"] == message_id
+    assert row["path"] == "docs/handoff.md"
+    assert row["git_ref"] == "abc123"
+    assert row["description"] == "handoff document"
+
+    show = run_cli("--bus", str(temp_bus), "show", message_id)
+    assert show.returncode == 0
+    assert artifact_id in show.stdout
+    assert "docs/handoff.md" in show.stdout
+
+
+def test_mailbox_commands_do_not_create_missing_bus(run_cli, tmp_path):
+    missing_bus = tmp_path / "missing.sqlite"
+
+    result = run_cli("--bus", str(missing_bus), "inbox", "--agent", "implementer")
+
+    assert result.returncode != 0
+    assert "does not exist" in result.stderr
+    assert not missing_bus.exists()
+
+
+def _field(output: str, name: str) -> str:
+    prefix = f"{name}: "
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return line.removeprefix(prefix)
+    raise AssertionError(f"missing {name!r} field in output: {output!r}")
+
+
+def _acked_at(bus_path: Path, message_id: str) -> str | None:
+    with sqlite3.connect(bus_path) as db:
+        return db.execute(
+            "select acked_at from messages where id = ?", (message_id,)
+        ).fetchone()[0]
