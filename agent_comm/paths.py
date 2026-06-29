@@ -22,7 +22,7 @@ def safe_project_slug(value: str) -> str:
 def project_key(value: str) -> str:
     normalized = _project_key_source(value)
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
-    return f"{safe_project_slug(_project_slug_source(normalized))}-{digest}"
+    return f"{safe_project_slug(normalized)}-{digest}"
 
 
 def canonical_origin(value: str) -> str:
@@ -58,7 +58,7 @@ def resolve_bus_path(
     if project:
         return _default_bus_path(project)
 
-    return _default_bus_path(derived_project_source(cwd))
+    return _default_derived_bus_path(derived_project_source(cwd))
 
 
 def derived_project_source(cwd: str | os.PathLike[str] | None = None) -> str:
@@ -117,22 +117,35 @@ def _git_superproject(cwd: Path) -> str | None:
 
 def _project_key_source(value: str) -> str:
     stripped = value.strip()
-    if stripped.startswith(("cwd:", "git-common-dir:")):
-        return stripped
     try:
         return canonical_origin(stripped)
     except BusResolutionError:
         return stripped
 
 
-def _project_slug_source(value: str) -> str:
-    if value.startswith("cwd:"):
-        return Path(value.removeprefix("cwd:")).name
-    return value
-
-
 def _default_bus_path(value: str) -> Path:
     return Path.home() / ".agent-comm" / "projects" / project_key(value) / "bus.sqlite"
+
+
+def _default_derived_bus_path(source: str) -> Path:
+    return (
+        Path.home()
+        / ".agent-comm"
+        / "projects"
+        / _derived_project_key(source)
+        / "bus.sqlite"
+    )
+
+
+def _derived_project_key(source: str) -> str:
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
+    return f"{safe_project_slug(_derived_slug_source(source))}-{digest}"
+
+
+def _derived_slug_source(source: str) -> str:
+    if source.startswith("cwd:"):
+        return Path(source.removeprefix("cwd:")).name
+    return source
 
 
 def _canonical_url_host(parsed) -> str:
