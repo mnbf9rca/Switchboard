@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from scripts.validate_skill_protocols import validate_skill_protocols
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+SKILLS = {
+    "coordinate-as-planner": {
+        "description": "Coordinate as the planning agent using agent-comm. Use when preparing implementation handoffs, sending deliberate messages to implementers, answering implementation questions, reviewing ready work, or accepting completed work through a durable local agent mailbox.",
+        "triggers": [
+            "preparing implementation handoffs",
+            "sending deliberate messages",
+            "answering implementation questions",
+            "reviewing ready work",
+            "accepting completed work",
+            "durable local agent mailbox",
+        ],
+    },
+    "coordinate-as-implementer": {
+        "description": "Coordinate as the implementation agent using agent-comm. Use when receiving planner handoffs, reading durable agent messages, acknowledging work, asking implementation questions, reporting blockers, or signaling ready-for-review work through a local mailbox.",
+        "triggers": [
+            "receiving planner handoffs",
+            "reading durable agent messages",
+            "acknowledging work",
+            "asking implementation questions",
+            "reporting blockers",
+            "signaling ready-for-review work",
+            "local mailbox",
+        ],
+    },
+}
+
+FORBIDDEN_TERMS = [
+    "post --type",
+    "wait --type",
+    "allow-unstructured",
+    "Intent:",
+    "Thread-State:",
+    "stale claim",
+    "checkpoint",
+    ".agent-comm.json",
+    ".agent-comm.local.json",
+    "events table",
+    "status/export",
+    "agent-comm status",
+    "agent-comm export",
+]
+EXAMPLE_HEADER_PATTERNS = [
+    "Requested action:",
+    "Expected reply:",
+    "Constraints:",
+    "Verification:",
+]
+
+EXAMPLES = [
+    "planner-handoff.md",
+    "implementer-question.md",
+    "implementer-blocker.md",
+    "ready-for-review.md",
+    "review-findings.md",
+]
+
+
+def parse_frontmatter(path: Path) -> tuple[dict[str, str], str]:
+    text = path.read_text()
+    assert text.startswith("---\n"), f"{path} is missing YAML frontmatter"
+    _, raw_frontmatter, body = text.split("---\n", 2)
+    frontmatter: dict[str, str] = {}
+    for line in raw_frontmatter.splitlines():
+        key, value = line.split(": ", 1)
+        frontmatter[key] = value
+    return frontmatter, body
+
+
+def test_skills_have_required_frontmatter_and_trigger_rich_descriptions():
+    for skill_name, expected in SKILLS.items():
+        path = ROOT / "skills" / skill_name / "SKILL.md"
+        frontmatter, body = parse_frontmatter(path)
+
+        assert set(frontmatter) == {"name", "description"}
+        assert frontmatter["name"] == skill_name
+        assert frontmatter["name"] == path.parent.name
+        assert frontmatter["description"] == expected["description"]
+        for trigger in expected["triggers"]:
+            assert trigger in frontmatter["description"]
+        assert "agent-comm --version" in body
+
+
+def test_each_skill_has_protocol_reference_and_validator_confirms_duplication():
+    paths = [
+        ROOT / "skills" / skill_name / "references" / "agent-communication-protocol.md"
+        for skill_name in SKILLS
+    ]
+    for path in paths:
+        assert path.exists()
+
+    validate_skill_protocols(ROOT)
+
+
+def test_plugin_manifests_expose_skills_as_harness_adapters():
+    claude_expected = {
+        "name": "agents-together",
+        "version": "0.1.0",
+        "description": "Durable local coordination workflows for independent coding agents",
+        "skills": "./skills/",
+    }
+    assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text()) == claude_expected
+
+    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
+    assert codex["name"] == claude_expected["name"]
+    assert codex["version"] == claude_expected["version"]
+    assert codex["description"] == claude_expected["description"]
+    assert codex["skills"] == claude_expected["skills"]
+    assert isinstance(codex["author"], dict)
+    assert codex["author"]["name"]
+    assert isinstance(codex["interface"], dict)
+    for key in (
+        "displayName",
+        "shortDescription",
+        "longDescription",
+        "developerName",
+        "category",
+        "capabilities",
+    ):
+        assert codex["interface"][key]
+
+
+def test_examples_exist_as_markdown_message_bodies():
+    for name in EXAMPLES:
+        path = ROOT / "examples" / name
+        text = path.read_text()
+        assert text.startswith("# ")
+        assert "agent-comm" not in text.lower() or "```" not in text
+        for pattern in EXAMPLE_HEADER_PATTERNS:
+            assert pattern not in text
+
+
+def test_skill_layer_does_not_reference_unimplemented_or_forbidden_protocol_terms():
+    paths = [
+        *ROOT.glob("skills/**/SKILL.md"),
+        *ROOT.glob("skills/**/references/*.md"),
+        *ROOT.glob("examples/*.md"),
+        ROOT / ".codex-plugin" / "plugin.json",
+        ROOT / ".claude-plugin" / "plugin.json",
+    ]
+    assert paths
+    for path in paths:
+        text = path.read_text()
+        for term in FORBIDDEN_TERMS:
+            assert term not in text, f"{path} contains forbidden term {term!r}"
