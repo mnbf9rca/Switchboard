@@ -34,10 +34,8 @@ def test_explicit_project_cwd_like_name_is_not_derived_path_tag(tmp_path, monkey
     monkeypatch.setenv("HOME", str(tmp_path))
 
     path = resolve_bus_path(bus=None, project="cwd:/tmp/app", cwd=tmp_path)
-    expected_key = project_key(canonical_origin("cwd:/tmp/app"))
 
-    assert project_key("cwd:/tmp/app") == expected_key
-    assert path.parent.name == expected_key
+    assert path.parent.name == project_key("cwd:/tmp/app")
     assert path.parent.name.startswith("cwd-tmp-app-")
 
 
@@ -49,11 +47,19 @@ def test_explicit_project_common_dir_like_name_is_not_derived_path_tag(
     path = resolve_bus_path(
         bus=None, project="git-common-dir:/tmp/repo/.git", cwd=tmp_path
     )
-    expected_key = project_key(canonical_origin("git-common-dir:/tmp/repo/.git"))
 
-    assert project_key("git-common-dir:/tmp/repo/.git") == expected_key
-    assert path.parent.name == expected_key
-    assert path.parent.name.startswith("git-common-dir-tmp-repo-")
+    assert path.parent.name == project_key("git-common-dir:/tmp/repo/.git")
+    assert path.parent.name.startswith("git-common-dir-tmp-repo-.git-")
+
+
+def test_project_key_treats_cwd_like_project_names_literally():
+    assert project_key("cwd:/tmp/app") != project_key("cwd/tmp/app")
+
+
+def test_project_key_treats_common_dir_like_project_names_literally():
+    assert project_key("git-common-dir:/tmp/repo/.git") != project_key(
+        "git-common-dir/tmp/repo"
+    )
 
 
 def test_missing_project_outside_git_uses_absolute_cwd(tmp_path, monkeypatch):
@@ -87,7 +93,7 @@ def test_origin_preserves_non_default_url_ports():
 
 def test_project_key_includes_slug_and_stable_hash():
     key = project_key("https://github.com/example/repo")
-    assert key.startswith("github.com-example-repo-")
+    assert key.startswith("https-github.com-example-repo-")
     assert len(key.rsplit("-", 1)[-1]) == 12
 
 

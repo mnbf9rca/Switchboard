@@ -20,7 +20,7 @@ def safe_project_slug(value: str) -> str:
 
 
 def project_key(value: str) -> str:
-    normalized = _project_key_source(value)
+    normalized = value.strip()
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
     return f"{safe_project_slug(normalized)}-{digest}"
 
@@ -113,14 +113,6 @@ def _git_superproject(cwd: Path) -> str | None:
         return None
     superproject = result.stdout.strip()
     return superproject or None
-
-
-def _project_key_source(value: str) -> str:
-    stripped = value.strip()
-    try:
-        return canonical_origin(stripped)
-    except BusResolutionError:
-        return stripped
 
 
 def _default_bus_path(value: str) -> Path:
