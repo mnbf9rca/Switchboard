@@ -14,6 +14,25 @@ def temp_bus(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def make_git_repo(tmp_path: Path):
+    def _make_git_repo(name: str, origin: str | None = None) -> Path:
+        repo = tmp_path / name
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
+        if origin is not None:
+            subprocess.run(
+                ["git", "remote", "add", "origin", origin],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        return repo
+
+    return _make_git_repo
+
+
+@pytest.fixture
 def cli_env() -> dict[str, str]:
     env = os.environ.copy()
     repo_root = Path(__file__).resolve().parents[1]
