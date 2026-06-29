@@ -22,7 +22,7 @@ def safe_project_slug(value: str) -> str:
 def project_key(value: str) -> str:
     normalized = _project_key_source(value)
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
-    return f"{safe_project_slug(normalized)}-{digest}"
+    return f"{safe_project_slug(_project_slug_source(normalized))}-{digest}"
 
 
 def canonical_origin(value: str) -> str:
@@ -58,18 +58,77 @@ def resolve_bus_path(
     if project:
         return _default_bus_path(project)
 
-    origin = _git_origin(Path(cwd) if cwd is not None else Path.cwd())
-    if origin is None:
-        raise BusResolutionError("Could not determine project; pass --project or --bus")
+    return _default_bus_path(derived_project_source(cwd))
 
-    return _default_bus_path(canonical_origin(origin))
+
+def derived_project_source(cwd: str | os.PathLike[str] | None = None) -> str:
+    base = Path(cwd) if cwd is not None else Path.cwd()
+    origin = _git_origin(base)
+    if origin is not None:
+        return canonical_origin(origin)
+
+    common_dir = _git_common_dir(base)
+    if common_dir is not None:
+        return f"git-common-dir:{common_dir}"
+
+    return f"cwd:{base.resolve()}"
+
+
+def _git_common_dir(cwd: Path) -> str | None:
+    if _git_superproject(cwd) is not None:
+        return None
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(cwd),
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    common_dir = result.stdout.strip()
+    return common_dir or None
+
+
+def _git_superproject(cwd: Path) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--show-superproject-working-tree"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    superproject = result.stdout.strip()
+    return superproject or None
 
 
 def _project_key_source(value: str) -> str:
+    stripped = value.strip()
+    if stripped.startswith(("cwd:", "git-common-dir:")):
+        return stripped
     try:
-        return canonical_origin(value)
+        return canonical_origin(stripped)
     except BusResolutionError:
-        return value.strip()
+        return stripped
+
+
+def _project_slug_source(value: str) -> str:
+    if value.startswith("cwd:"):
+        return Path(value.removeprefix("cwd:")).name
+    return value
 
 
 def _default_bus_path(value: str) -> Path:

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import pytest
+import subprocess
 
 from agent_comm.paths import (
-    BusResolutionError,
     canonical_origin,
     project_key,
     resolve_bus_path,
@@ -31,9 +30,18 @@ def test_project_uses_default_state_dir(tmp_path, monkeypatch):
     assert path.name == "bus.sqlite"
 
 
-def test_missing_project_outside_git_fails(tmp_path):
-    with pytest.raises(BusResolutionError, match="--project or --bus"):
-        resolve_bus_path(bus=None, project=None, cwd=tmp_path)
+def test_missing_project_outside_git_uses_absolute_cwd(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    workdir = tmp_path / "plain-project"
+    workdir.mkdir()
+
+    path = resolve_bus_path(bus=None, project=None, cwd=workdir)
+
+    assert path.parent.parent == home / ".agent-comm" / "projects"
+    assert path.parent.name.startswith("plain-project-")
+    assert len(path.parent.name.rsplit("-", 1)[-1]) == 12
+    assert path.name == "bus.sqlite"
 
 
 def test_origin_canonicalizes_ssh_and_https_forms():
@@ -66,10 +74,36 @@ def test_two_worktrees_with_same_origin_share_default_bus(
     assert resolve_bus_path(None, None, repo_a) == resolve_bus_path(None, None, repo_b)
 
 
-def test_git_unavailable_falls_through_to_bus_resolution_error(tmp_path, monkeypatch):
+def test_linked_worktrees_without_origin_share_common_dir_bus(
+    make_git_repo, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    main = make_git_repo("main")
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=main, check=True)
+    (main / "README.md").write_text("# Main\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=main, check=True)
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(main), "worktree", "add", str(linked)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert resolve_bus_path(None, None, main) == resolve_bus_path(None, None, linked)
+
+
+def test_git_unavailable_uses_absolute_cwd(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
     def raise_missing_git(*_args, **_kwargs):
         raise FileNotFoundError("git")
 
     monkeypatch.setattr("agent_comm.paths.subprocess.run", raise_missing_git)
-    with pytest.raises(BusResolutionError, match="--project or --bus"):
-        resolve_bus_path(bus=None, project=None, cwd=tmp_path)
+
+    path = resolve_bus_path(bus=None, project=None, cwd=tmp_path)
+
+    assert path.parent.parent == tmp_path / "home" / ".agent-comm" / "projects"
+    assert path.name == "bus.sqlite"
