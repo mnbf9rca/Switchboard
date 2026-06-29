@@ -68,6 +68,8 @@ EXAMPLES = [
     "review-findings.md",
 ]
 
+CLI_V2_SPEC = ROOT / "docs" / "superpowers" / "specs" / "2026-06-29-agent-comm-cli-v2.md"
+
 
 def parse_frontmatter(path: Path) -> tuple[dict[str, str], str]:
     text = path.read_text()
@@ -138,6 +140,7 @@ def test_protocol_guides_agent_communication_not_cli_help():
         "Use one thread for one coherent stream of work or review",
         "Use wait or follow only when you are actually blocked",
         "Do not invent precedence rules in the tool layer",
+        "Include the worktree name or branch in your agent id",
     ):
         assert guidance in protocol
 
@@ -145,6 +148,29 @@ def test_protocol_guides_agent_communication_not_cli_help():
     before_appendix = protocol.split("## Minimal Command Appendix", 1)[0]
     assert before_appendix.count("agent-comm ") == 0
     assert command_appendix.count("agent-comm ") <= 14
+
+
+def test_cli_v2_spec_derives_project_identity_without_project_or_bus_in_normal_path():
+    text = CLI_V2_SPEC.read_text()
+
+    for required in (
+        "The normal path does not require `--project` or `--bus`.",
+        "git remote `origin`",
+        "`git rev-parse --git-common-dir`",
+        "same project share one mailbox",
+        "`--bus PATH` remains available for tests, diagnostics, and emergencies",
+        "If the shared user-local bus is blocked by a harness sandbox",
+    ):
+        assert required in text
+
+    primary = text.split("## Primary Command", 1)[1].split("## Message Bodies", 1)[0]
+    assert "--project" not in primary
+    assert "--bus" not in primary
+    assert "agent-comm send --as <sender> --to <recipient>" in primary
+
+    skill_guidance = text.split("## Skill Guidance", 1)[1].split("## Critical Review", 1)[0]
+    assert "--project" not in skill_guidance
+    assert "--bus" not in skill_guidance
 
 
 def test_plugin_manifests_expose_skills_as_harness_adapters():

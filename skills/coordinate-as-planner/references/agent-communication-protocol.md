@@ -10,6 +10,8 @@ Do not send routine progress updates, private scratch notes, command transcripts
 
 Every message should be addressed, intentional, and useful on its own. A reader should be able to understand who needs to do what, why now, where the durable context lives, and what kind of reply closes the loop.
 
+Agent ids are explicit collaboration handles, not global user identities. Include the worktree name or branch in your agent id when multiple agents may work in different worktrees of the same project, for example `planner-main`, `implementer-feature-a`, or `reviewer-bugfix-123`. This keeps shared-mailbox messages readable without requiring the bus to understand worktree state.
+
 ## What To Include
 
 Use short Markdown bodies. Prefer this shape when it fits:
