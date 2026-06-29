@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -156,7 +157,8 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
 
     codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
     assert codex["name"] == claude_expected["name"]
-    assert codex["version"] == claude_expected["version"]
+    assert codex["version"].startswith(f"{claude_expected['version']}+codex.")
+    assert re.fullmatch(r"0\.1\.0\+codex\.[0-9a-z-]+", codex["version"])
     assert codex["description"] == claude_expected["description"]
     assert codex["skills"] == claude_expected["skills"]
     assert isinstance(codex["author"], dict)
