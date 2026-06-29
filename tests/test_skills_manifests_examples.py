@@ -171,6 +171,39 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
         assert codex["interface"][key]
 
 
+def test_repo_local_codex_marketplace_exposes_plugin_root():
+    marketplace_root = ROOT / ".agents" / "plugins"
+    marketplace = json.loads((marketplace_root / "marketplace.json").read_text())
+
+    assert marketplace == {
+        "name": "agents-together-local",
+        "interface": {
+            "displayName": "Agents Together Local",
+        },
+        "plugins": [
+            {
+                "name": "agents-together",
+                "source": {
+                    "source": "local",
+                    "path": "./plugins/agents-together",
+                },
+                "policy": {
+                    "installation": "AVAILABLE",
+                    "authentication": "ON_INSTALL",
+                },
+                "category": "Productivity",
+            }
+        ],
+    }
+
+    plugin_root = marketplace_root / "plugins" / "agents-together"
+    assert plugin_root.is_dir()
+    assert (plugin_root / ".codex-plugin").resolve() == ROOT / ".codex-plugin"
+    assert (plugin_root / "skills").resolve() == ROOT / "skills"
+    assert (plugin_root / ".codex-plugin" / "plugin.json").exists()
+    assert (plugin_root / "skills" / "coordinate-as-planner" / "SKILL.md").exists()
+
+
 def test_examples_exist_as_markdown_message_bodies():
     for name in EXAMPLES:
         path = ROOT / "examples" / name

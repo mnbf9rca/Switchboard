@@ -30,15 +30,15 @@ printf 'BUS=%s\n' "$BUS"
 Use `python -m agent_comm` for a source checkout smoke test. Use `agent-comm`
 instead after installing the package and confirming `agent-comm --version` works.
 
-Expose the local Codex plugin from:
+Add the local Codex marketplace source from:
 
 ```text
-/Users/rob/Downloads/git/agents-together/.codex-plugin/plugin.json
+/Users/rob/Downloads/git/agents-together/.agents/plugins
 ```
 
-If your Codex build uses a local marketplace fixture, point that fixture at the
-same plugin manifest path above, then start a new Codex session after refreshing
-the fixture.
+In Codex, use `/plugins`, add that marketplace source, then install
+`agents-together` from the `agents-together-local` marketplace. Start a new Codex
+session after installing so the skills are loaded.
 
 Expose the local Claude plugin from:
 

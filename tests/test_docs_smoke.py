@@ -22,8 +22,9 @@ def test_fresh_agent_smoke_guide_documents_local_installs():
     text = _guide_text()
     normalized = " ".join(text.lower().split())
 
-    assert ".codex-plugin/plugin.json" in text
-    assert "marketplace fixture" in text
+    assert ".agents/plugins" in text
+    assert "/plugins" in text
+    assert "agents-together-local" in text
     assert ".claude-plugin/plugin.json" in text
     assert "Claude" in text
     assert "local skills-directory installs may use a different claude namespace" in normalized
