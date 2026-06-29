@@ -3,14 +3,14 @@
   "version": "0.2.0",
   "description": "A local mailbox for deliberate agent coordination",
   "author": {
-    "name": "switchboard"
+    "name": "mnbf9rca"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Switchboard",
     "shortDescription": "A local mailbox for deliberate agent coordination",
     "longDescription": "Coordinate planner and implementer agents through local Agent Skills and the Switchboard mailbox.",
-    "developerName": "switchboard",
+    "developerName": "mnbf9rca",
     "category": "Productivity",
     "capabilities": [
       "Skills"

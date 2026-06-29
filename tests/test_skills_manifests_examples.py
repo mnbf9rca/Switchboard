@@ -205,8 +205,10 @@ def test_protocol_guides_agent_communication_not_cli_help():
 def test_plugin_manifests_expose_skills_as_harness_adapters():
     claude_expected = {
         "name": "switchboard",
+        "displayName": "Switchboard",
         "version": "0.2.0",
         "description": "A local mailbox for deliberate agent coordination",
+        "author": {"name": "mnbf9rca"},
         "skills": "./skills/",
     }
     assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text()) == claude_expected
@@ -217,8 +219,10 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
     assert codex["description"] == claude_expected["description"]
     assert codex["skills"] == claude_expected["skills"]
     assert isinstance(codex["author"], dict)
-    assert codex["author"]["name"]
+    assert codex["author"] == claude_expected["author"]
     assert isinstance(codex["interface"], dict)
+    assert codex["interface"]["displayName"] == claude_expected["displayName"]
+    assert codex["interface"]["developerName"] == claude_expected["author"]["name"]
     for key in (
         "displayName",
         "shortDescription",
