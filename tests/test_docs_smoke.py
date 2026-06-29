@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -49,57 +48,57 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
     assert "BUS=\"$BUS_DIR/bus.sqlite\"" in text
     assert "printf 'BUS=%s\\n' \"$BUS\"" in text
     assert "<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>" in text
-    assert "run_agent_comm() {" in text
 
 
 def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
     text = _guide_text()
 
-    for snippet in (
-        "--subject \"Smoke handoff\"",
-        "Artifact: docs/smoke-tests/fresh-agent-sessions.md",
+    required_snippets = (
         "BUS=\"<paste BUS printed by setup>\"",
         "replace pasted bus value before running",
-        "printf 'THREAD_ID=%s\\n' \"$THREAD_ID\"",
         "printf 'MSG_PLANNER_TO_IMPLEMENTER=%s\\n' \"$MSG_PLANNER_TO_IMPLEMENTER\"",
         "printf 'MSG_IMPLEMENTER_TO_PLANNER=%s\\n' \"$MSG_IMPLEMENTER_TO_PLANNER\"",
-        "artifact add",
-        "--message \"$MSG_PLANNER_TO_IMPLEMENTER\"",
-        "--path docs/smoke-tests/fresh-agent-sessions.md",
-        "THREAD_ID=\"<paste THREAD_ID printed by planner>\"",
         "MSG_PLANNER_TO_IMPLEMENTER=\"<paste MSG_PLANNER_TO_IMPLEMENTER printed by planner>\"",
         "MSG_IMPLEMENTER_TO_PLANNER=\"<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>\"",
         "replace pasted bus and planner values before running",
         "replace pasted bus, planner, and implementer values before running",
-        "status --thread \"$THREAD_ID\"",
-        "reply_links:",
-        "--reply-to \"$MSG_PLANNER_TO_IMPLEMENTER\"",
-    ):
+        'agent-comm --bus "$BUS" next --as implementer-feature-a',
+        'agent-comm --bus "$BUS" inbox --as planner-main',
+    )
+    for snippet in required_snippets:
         assert snippet in text
 
-    for pattern in (
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+post",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+inbox\s+--agent\s+implementer",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+show\s+\"\$MSG_PLANNER_TO_IMPLEMENTER\"",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+ack\s+\"\$MSG_PLANNER_TO_IMPLEMENTER\"\s+--agent\s+implementer",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+inbox\s+--agent\s+planner",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+show\s+\"\$MSG_IMPLEMENTER_TO_PLANNER\"",
-        r"run_agent_comm\s+--bus\s+\"\$BUS\"\s+status\s+--thread\s+\"\$THREAD_ID\"",
-    ):
-        assert re.search(pattern, text)
+    compact = " ".join(text.replace("\\\n", " ").split())
+    assert (
+        'agent-comm --bus "$BUS" send --as planner-main --to implementer-feature-a '
+        '--title "Fresh session smoke"'
+    ) in compact
+    assert (
+        'agent-comm --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" '
+        '--as implementer-feature-a'
+    ) in compact
+
+    forbidden_snippets = (
+        "THREAD_ID",
+        "register",
+        "start-thread",
+        "run_agent_comm",
+        "artifact add",
+        "status --thread",
+        "--reply-to",
+        "--agent implementer",
+        "--agent planner",
+    )
+    for snippet in forbidden_snippets:
+        assert snippet not in text
+
+    assert 'agent-comm --bus "$BUS" post' not in text
 
 
 def test_fresh_agent_smoke_flow_commands_round_trip(tmp_path):
     bus = tmp_path / "smoke.db"
-    planner_body = tmp_path / "planner.md"
-    implementer_body = tmp_path / "implementer.md"
-    planner_body.write_text(
-        "# Smoke handoff\n\nArtifact: docs/smoke-tests/fresh-agent-sessions.md\n",
-        encoding="utf-8",
-    )
-    implementer_body.write_text("# Smoke reply\n\nMailbox round trip works.\n", encoding="utf-8")
 
-    def run_agent_comm(*args: str) -> subprocess.CompletedProcess[str]:
+    def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, "-m", "agent_comm", *args],
             cwd=ROOT,
@@ -108,117 +107,50 @@ def test_fresh_agent_smoke_flow_commands_round_trip(tmp_path):
             check=True,
         )
 
-    run_agent_comm("--bus", str(bus), "init", "--project", "agents-together-smoke")
-    run_agent_comm(
-        "--bus",
-        str(bus),
-        "register",
-        "--agent",
-        "planner",
-        "--display-name",
-        "Planner",
-        "--harness",
-        "codex",
-        "--role",
-        "planner",
-    )
-    run_agent_comm(
-        "--bus",
-        str(bus),
-        "register",
-        "--agent",
-        "implementer",
-        "--display-name",
-        "Implementer",
-        "--harness",
-        "claude",
-        "--role",
-        "implementer",
-    )
-    thread_id = _field(
-        run_agent_comm(
+    planner_message_id = _field(
+        run_cli(
             "--bus",
             str(bus),
-            "start-thread",
-            "--project",
-            "agents-together-smoke",
+            "send",
+            "--as",
+            "planner-main",
+            "--to",
+            "implementer-feature-a",
             "--title",
             "Fresh session smoke",
-        ).stdout,
-        "thread",
-    )
-    planner_message_id = _field(
-        run_agent_comm(
-            "--bus",
-            str(bus),
-            "post",
-            "--thread",
-            thread_id,
-            "--from",
-            "planner",
-            "--to",
-            "implementer",
-            "--subject",
-            "Smoke handoff",
-            "--body-file",
-            str(planner_body),
+            "Please acknowledge this handoff and reply that the mailbox round trip works.",
         ).stdout,
         "message",
     )
-    run_agent_comm(
+    next_message = run_cli(
         "--bus",
         str(bus),
-        "artifact",
-        "add",
-        "--thread",
-        thread_id,
-        "--message",
-        planner_message_id,
-        "--path",
-        "docs/smoke-tests/fresh-agent-sessions.md",
-        "--description",
-        "Smoke handoff guide",
-    )
-
-    assert planner_message_id in run_agent_comm(
-        "--bus", str(bus), "inbox", "--agent", "implementer"
+        "next",
+        "--as",
+        "implementer-feature-a",
     ).stdout
-    shown_handoff = run_agent_comm("--bus", str(bus), "show", planner_message_id).stdout
-    assert "Artifact: docs/smoke-tests/fresh-agent-sessions.md" in shown_handoff
-    assert "Smoke handoff guide" in shown_handoff
-    run_agent_comm("--bus", str(bus), "ack", planner_message_id, "--agent", "implementer")
+    assert planner_message_id in next_message
+    assert "Please acknowledge this handoff" in next_message
 
     implementer_message_id = _field(
-        run_agent_comm(
+        run_cli(
             "--bus",
             str(bus),
-            "post",
-            "--thread",
-            thread_id,
-            "--from",
-            "implementer",
-            "--to",
-            "planner",
-            "--subject",
-            "Smoke reply",
-            "--body-file",
-            str(implementer_body),
-            "--reply-to",
+            "reply",
             planner_message_id,
+            "--as",
+            "implementer-feature-a",
+            "Received. The mailbox round trip works.",
         ).stdout,
         "message",
     )
-    assert implementer_message_id in run_agent_comm(
-        "--bus", str(bus), "inbox", "--agent", "planner"
+    assert implementer_message_id in run_cli(
+        "--bus", str(bus), "inbox", "--as", "planner-main"
     ).stdout
-    assert "Mailbox round trip works." in run_agent_comm(
+    shown_reply = run_cli(
         "--bus", str(bus), "show", implementer_message_id
     ).stdout
-    status = run_agent_comm("--bus", str(bus), "status", "--thread", thread_id).stdout
-    assert "reply_links:" in status
-    assert f"message: {implementer_message_id}" in status
-    assert f"replies_to: {planner_message_id}" in status
-    run_agent_comm("--bus", str(bus), "ack", implementer_message_id, "--agent", "planner")
+    assert "Received. The mailbox round trip works." in shown_reply
 
 
 def _field(output: str, key: str) -> str:

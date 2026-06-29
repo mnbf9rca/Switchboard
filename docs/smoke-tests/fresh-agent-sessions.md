@@ -139,28 +139,3 @@ agent-comm --bus "$BUS" inbox --as planner-main
 ```
 
 The smoke test passes when the planner inbox includes the implementer's reply.
-
-<!--
-Compatibility markers for older docs tests. These removed low-level commands
-are not part of the normal smoke workflow above:
---subject "Smoke handoff"
-Artifact: docs/smoke-tests/fresh-agent-sessions.md
-printf 'THREAD_ID=%s\n' "$THREAD_ID"
-artifact add
---message "$MSG_PLANNER_TO_IMPLEMENTER"
---path docs/smoke-tests/fresh-agent-sessions.md
-THREAD_ID="<paste THREAD_ID printed by planner>"
-status --thread "$THREAD_ID"
-reply_links:
---reply-to "$MSG_PLANNER_TO_IMPLEMENTER"
-run_agent_comm() {
-  python -m agent_comm "$@"
-}
-run_agent_comm --bus "$BUS" post
-run_agent_comm --bus "$BUS" inbox --agent implementer
-run_agent_comm --bus "$BUS" show "$MSG_PLANNER_TO_IMPLEMENTER"
-run_agent_comm --bus "$BUS" ack "$MSG_PLANNER_TO_IMPLEMENTER" --agent implementer
-run_agent_comm --bus "$BUS" inbox --agent planner
-run_agent_comm --bus "$BUS" show "$MSG_IMPLEMENTER_TO_PLANNER"
-run_agent_comm --bus "$BUS" status --thread "$THREAD_ID"
--->
