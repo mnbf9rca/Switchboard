@@ -68,7 +68,7 @@ Example:
 
 ```sh
 agent-comm send --as planner-main --to implementer-feature-a \
-  --thread "Coordination test" \
+  --title "Coordination test" \
   "Please acknowledge this test and reply."
 ```
 
@@ -77,7 +77,7 @@ agent-comm send --as planner-main --to implementer-feature-a \
 - creates or opens the bus
 - initializes the schema if needed
 - ensures sender and recipient agent rows exist
-- creates a thread when needed
+- creates a new thread unless `--in-thread <thread-id>` is passed
 - posts the message
 - attaches any artifact paths passed with `--artifact`
 - prints the thread id and message id
@@ -109,17 +109,30 @@ Agents should not create a file just to send a short message.
 
 ## Threads
 
-`--thread` accepts either an existing thread id or a title.
+Every message belongs to exactly one thread.
+
+`send` creates a new thread unless `--in-thread <thread-id>` is passed.
 
 ```sh
 agent-comm send --as planner-main --to implementer-feature-a \
-  --thread "Implement login fix" \
   "Please review the failing test and propose a fix."
 ```
 
-If `--thread` is omitted, `send` creates a thread with the message subject or a
-short derived title. Agents may pass `--thread` when the conversation should
-continue in a known work stream.
+To continue an existing thread without replying to a specific message:
+
+```sh
+agent-comm send --as planner-main --to implementer-feature-a \
+  --in-thread thread_123 \
+  "One more clarification for the same work stream."
+```
+
+For a new thread, `--title` is optional display metadata:
+
+```sh
+agent-comm send --as planner-main --to implementer-feature-a \
+  --title "Implement login fix" \
+  "Please review the failing test and propose a fix."
+```
 
 Thread ids remain printed in command output so agents can reuse them when useful.
 
@@ -157,9 +170,13 @@ agent-comm reply msg_123 --as implementer-feature-a \
 
 - looks up the original message
 - uses the original thread
-- addresses the reply to the original sender unless `--to` is supplied
+- addresses the reply to the original sender
 - links the reply to the original message
+- acknowledges the message being answered for the replying agent
 - accepts `--artifact`, `--body-file`, `--stdin`, and `--wait`
+
+`reply` never accepts `--to`. Messages are 1:1: one sender and one recipient.
+To notify multiple agents, send multiple messages.
 
 ## Reading
 
@@ -175,12 +192,6 @@ Show the next unread message:
 agent-comm next --as <agent>
 ```
 
-Show and acknowledge the next unread message:
-
-```sh
-agent-comm next --as <agent> --ack
-```
-
 Show a specific message:
 
 ```sh
@@ -192,6 +203,10 @@ Acknowledge a specific message:
 ```sh
 agent-comm ack --as <agent> <message-id>
 ```
+
+`next` and `show` never acknowledge messages. `ack` is always a separate command
+when no reply is sent. `reply` automatically acknowledges the message being
+answered because sending a reply proves the replying agent read it.
 
 Wait for unread mail:
 
@@ -226,14 +241,14 @@ Planner example:
 
 ```sh
 agent-comm send --as planner-main --to implementer-feature-a \
-  --thread "<work title>" \
+  --title "<work title>" \
   "Please review this handoff and reply with questions or acknowledgement."
 ```
 
 Implementer example:
 
 ```sh
-agent-comm next --as implementer-feature-a --ack
+agent-comm next --as implementer-feature-a
 agent-comm reply <message-id> --as implementer-feature-a \
   "Received. I will proceed and report blockers in this thread."
 ```
@@ -246,6 +261,7 @@ Skills must state:
 - Use `--artifact` only when useful durable context already exists or should
   exist as a project artifact.
 - Do not create a file just to satisfy the CLI.
+- Use `ack` explicitly when you read a message but are not replying yet.
 - Use `--wait` only when blocked on a reply.
 - Do not inspect CLI help for the normal path unless a command fails.
 
@@ -258,9 +274,9 @@ facts.
 
 Main risks:
 
-- `--thread` accepting both title and id can be ambiguous. This is acceptable if
-  thread ids have a reserved prefix such as `thread_`; otherwise split into
-  `--thread-id` and `--thread`.
+- Agents may still overuse `--in-thread`. Skills should teach that `reply` is
+  the normal way to continue a conversation; `--in-thread` is for deliberate
+  continuation without replying to a specific message.
 - Auto-registering agents is convenient but may hide typos in agent ids. The CLI
   should print when it creates an agent row so mistakes are visible.
 - A shared user-local bus is semantically right for multi-worktree coordination
