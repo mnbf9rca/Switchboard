@@ -57,7 +57,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERR_SKILL_PROTOCOLS: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Validated {len(paths)} skill protocol references.")
+    compared = "\n".join(str(path) for path in paths)
+    print(f"Validated {len(paths)} skill protocol references:\n{compared}")
     return 0
 
 

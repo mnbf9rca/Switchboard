@@ -18,6 +18,7 @@ Development invocation uses `uv` only as a developer convenience:
 ```sh
 uv run --python 3.12 python --version
 uv run pytest
+uv run python scripts/validate_skill_protocols.py
 uv run agent-comm --help
 ```
 

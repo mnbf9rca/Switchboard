@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: validate-skill-protocols
+        name: Validate skill protocol references
+        entry: python3 scripts/validate_skill_protocols.py
+        language: system
+        pass_filenames: false
