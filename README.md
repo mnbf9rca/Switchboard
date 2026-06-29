@@ -77,8 +77,4 @@ uv run --python 3.12 switchboard --help
 
 ## Smoke Test
 
-See the fresh-agent smoke test guide:
-
-```text
-docs/smoke-tests/fresh-agent-sessions.md
-```
+See the [fresh-agent smoke test guide](docs/smoke-tests/fresh-agent-sessions.md).
