@@ -1,32 +1,84 @@
-# agent-comm
+# Switchboard
 
-`agent-comm` is a durable local mailbox for independent coding agents working in
-separate sessions, worktrees, or harnesses. It is intentionally small: the CLI
-coordinates addressed messages and related records, while project plans, review
-notes, logs, and working context stay in normal project files.
+Switchboard is a local mailbox for deliberate coordination between independent
+coding agents working in separate sessions, worktrees, or harnesses.
 
-Runtime invocation:
+It is intentionally small. Switchboard stores addressed messages, replies,
+acknowledgements, and artifact links through SQLite. Plans, review notes, logs,
+large context, and project decisions stay in normal project files, where the
+repository can review and version them.
+
+## What It Is
+
+- A local CLI for sending explicit handoffs between agents.
+- A durable SQLite mailbox for addressed messages and replies.
+- A lightweight way to link project artifacts from mailbox messages.
+- A coordination tool for humans and agents sharing one project.
+
+## What It Is Not
+
+- A task tracker, scheduler, workflow engine, or chat room.
+- A replacement for plans, design notes, review docs, or logs.
+- A place to paste secrets, credentials, private tokens, or large proprietary
+  context.
+- A network service or hosted collaboration platform.
+
+## Quick Start
+
+Send a handoff:
 
 ```sh
-agent-comm --help
-python3.12 -m agent_comm --help
+switchboard send --as planner-main --to implementer-feature-a --title "Review plan" "Please review the plan and reply with blockers."
 ```
 
-Development invocation uses `uv` only as a developer convenience:
+Read the next addressed message:
 
 ```sh
-uv run --python 3.12 python --version
-uv run pytest
-uv run python scripts/validate_skill_protocols.py
-uv run agent-comm --help
+switchboard next --as implementer-feature-a
 ```
 
-Fresh-agent plugin smoke test:
+Reply to a message:
+
+```sh
+switchboard reply <message-id> --as implementer-feature-a "No blockers."
+```
+
+Check an inbox:
+
+```sh
+switchboard inbox --as planner-main
+```
+
+By default, Switchboard stores each project mailbox at:
+
+```text
+~/.switchboard/projects/<project-key>/bus.sqlite
+```
+
+Linked worktrees for the same project share one mailbox. There is no repo-local
+fallback mailbox.
+
+## Runtime Commands
+
+```sh
+switchboard --help
+python3.12 -m switchboard --help
+```
+
+## Development Commands
+
+Use `uv` from a development checkout:
+
+```sh
+uv run --python 3.12 pytest -q
+uv run --python 3.12 python scripts/validate_skill_protocols.py
+uv run --python 3.12 switchboard --help
+```
+
+## Smoke Test
+
+See the fresh-agent smoke test guide:
 
 ```text
 docs/smoke-tests/fresh-agent-sessions.md
 ```
-
-Do not paste secrets, credentials, private tokens, or large proprietary logs into
-mailbox messages. Prefer linking to project artifacts when large or sensitive
-context is needed.

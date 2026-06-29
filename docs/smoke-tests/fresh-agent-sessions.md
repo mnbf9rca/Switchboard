@@ -8,46 +8,46 @@ implementer session can discover the skills and exchange one mailbox handoff.
 Run from this repository:
 
 ```sh
-ROOT=/Users/rob/Downloads/git/agents-together
+ROOT="<repo root>"
 BUS_DIR=$(mktemp -d)
 chmod 700 "$BUS_DIR"
 BUS="$BUS_DIR/bus.sqlite"
 cd "$ROOT"
 
 python scripts/build_codex_plugin.py
-python3.12 -m agent_comm --version
-command -v agent-comm >/dev/null && agent-comm --version
-agent-comm --version
+python3.12 -m switchboard --version
+command -v switchboard >/dev/null && switchboard --version
+switchboard --version
 
 printf 'BUS=%s\n' "$BUS"
 ```
 
-Use `uv run --python 3.12 agent-comm` instead if `agent-comm` is not on `PATH`.
+Use `uv run --python 3.12 switchboard` instead if `switchboard` is not on `PATH`.
 
 Add the local Codex marketplace source from:
 
 ```text
-/Users/rob/Downloads/git/agents-together
+<repo root>
 ```
 
 In Codex, use `/plugins`, add that marketplace source, then install
-`agents-together` from the `agents-together-local` marketplace. Start a new Codex
+`switchboard` from the `switchboard-local` marketplace. Start a new Codex
 session after installing so the skills are loaded.
 
 The marketplace file lives at `.agents/plugins/marketplace.json`, and its
-plugin source points at the generated `plugins/agents-together` bundle. Re-run
+plugin source points at the generated `plugins/switchboard` bundle. Re-run
 `python scripts/build_codex_plugin.py` and reinstall the plugin after source
 changes so Codex picks up a new cachebusted plugin version.
 
 Expose the local Claude plugin from:
 
 ```text
-/Users/rob/Downloads/git/agents-together/.claude-plugin/plugin.json
+<repo root>/.claude-plugin/plugin.json
 ```
 
 In Claude, plugin installs should expose the skills as
-`/agents-together:coordinate-as-planner` and
-`/agents-together:coordinate-as-implementer`. Local skills-directory installs may
+`/switchboard:coordinate-as-planner` and
+`/switchboard:coordinate-as-implementer`. Local skills-directory installs may
 use a different Claude namespace; if so, use that displayed namespace while
 keeping the skill name the same.
 
@@ -59,13 +59,13 @@ If the harness lists available skills, confirm both skill names appear there.
 Start a fresh planner agent session and invoke:
 
 ```text
-/agents-together:coordinate-as-planner
+/switchboard:coordinate-as-planner
 ```
 
 Tell the planner to use this runtime:
 
 ```text
-<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>
+<installed plugin root>/scripts/switchboard --bus <BUS printed by setup>
 ```
 
 Then create and send the handoff:
@@ -76,7 +76,7 @@ case "$BUS" in
   *"<paste"*) echo "replace pasted bus value before running"; exit 1 ;;
 esac
 
-MSG_PLANNER_TO_IMPLEMENTER=$(agent-comm --bus "$BUS" send \
+MSG_PLANNER_TO_IMPLEMENTER=$(switchboard --bus "$BUS" send \
   --as planner-main \
   --to implementer-feature-a \
   --title "Fresh session smoke" \
@@ -95,13 +95,13 @@ uses a separate shell, replace that placeholder manually in the commands below.
 Start a fresh implementer agent session and invoke:
 
 ```text
-/agents-together:coordinate-as-implementer
+/switchboard:coordinate-as-implementer
 ```
 
 Tell the implementer to use this runtime:
 
 ```text
-<installed plugin root>/scripts/agent-comm --bus <BUS printed by setup>
+<installed plugin root>/scripts/switchboard --bus <BUS printed by setup>
 ```
 
 Then read and reply to the handoff:
@@ -113,8 +113,8 @@ case "$BUS:$MSG_PLANNER_TO_IMPLEMENTER" in
   *"<paste"*) echo "replace pasted bus and planner values before running"; exit 1 ;;
 esac
 
-agent-comm --bus "$BUS" next --as implementer-feature-a
-MSG_IMPLEMENTER_TO_PLANNER=$(agent-comm --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" \
+switchboard --bus "$BUS" next --as implementer-feature-a
+MSG_IMPLEMENTER_TO_PLANNER=$(switchboard --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" \
   --as implementer-feature-a \
   "Received. The mailbox round trip works." \
   | awk '/^message: / {print $2}')
@@ -135,7 +135,7 @@ case "$BUS:$MSG_IMPLEMENTER_TO_PLANNER" in
   *"<paste"*) echo "replace pasted bus, planner, and implementer values before running"; exit 1 ;;
 esac
 
-agent-comm --bus "$BUS" inbox --as planner-main
+switchboard --bus "$BUS" inbox --as planner-main
 ```
 
 The smoke test passes when the planner inbox includes the implementer's reply.

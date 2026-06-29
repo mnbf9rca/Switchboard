@@ -34,7 +34,10 @@ def test_pre_commit_runs_skill_protocol_validator_as_local_hook():
 def test_readme_documents_skill_protocol_validator():
     readme = ROOT / "README.md"
 
-    assert "uv run python scripts/validate_skill_protocols.py" in readme.read_text()
+    assert (
+        "uv run --python 3.12 python scripts/validate_skill_protocols.py"
+        in readme.read_text()
+    )
 
 
 def test_protocol_validator_cli_prints_compared_paths():
