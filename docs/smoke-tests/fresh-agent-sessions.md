@@ -16,13 +16,12 @@ cd "$ROOT"
 
 python scripts/build_codex_plugin.py
 python3.12 -m switchboard --version
-command -v switchboard >/dev/null && switchboard --version
-switchboard --version
 
 printf 'BUS=%s\n' "$BUS"
 ```
 
-Use `uv run --python 3.12 switchboard` instead if `switchboard` is not on `PATH`.
+Use `uv run --python 3.12 python -m switchboard` instead if `python3.12`
+does not have the checkout dependencies available.
 
 Add the local Codex marketplace source from:
 
@@ -76,7 +75,7 @@ case "$BUS" in
   *"<paste"*) echo "replace pasted bus value before running"; exit 1 ;;
 esac
 
-MSG_PLANNER_TO_IMPLEMENTER=$(switchboard --bus "$BUS" send \
+MSG_PLANNER_TO_IMPLEMENTER=$(python3.12 -m switchboard --bus "$BUS" send \
   --as planner-main \
   --to implementer-feature-a \
   --title "Fresh session smoke" \
@@ -113,8 +112,8 @@ case "$BUS:$MSG_PLANNER_TO_IMPLEMENTER" in
   *"<paste"*) echo "replace pasted bus and planner values before running"; exit 1 ;;
 esac
 
-switchboard --bus "$BUS" next --as implementer-feature-a
-MSG_IMPLEMENTER_TO_PLANNER=$(switchboard --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" \
+python3.12 -m switchboard --bus "$BUS" next --as implementer-feature-a
+MSG_IMPLEMENTER_TO_PLANNER=$(python3.12 -m switchboard --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" \
   --as implementer-feature-a \
   "Received. The mailbox round trip works." \
   | awk '/^message: / {print $2}')
@@ -132,10 +131,10 @@ Return to the planner session:
 BUS="<paste BUS printed by setup>"
 MSG_IMPLEMENTER_TO_PLANNER="<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>"
 case "$BUS:$MSG_IMPLEMENTER_TO_PLANNER" in
-  *"<paste"*) echo "replace pasted bus, planner, and implementer values before running"; exit 1 ;;
+  *"<paste"*) echo "replace pasted bus and implementer values before running"; exit 1 ;;
 esac
 
-switchboard --bus "$BUS" inbox --as planner-main
+python3.12 -m switchboard --bus "$BUS" inbox --as planner-main
 ```
 
 The smoke test passes when the planner inbox includes the implementer's reply.

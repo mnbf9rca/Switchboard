@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -42,10 +43,12 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
     text = _guide_text()
 
     assert "python3.12 -m switchboard --version" in text
+    assert "uv run --python 3.12 python -m switchboard" in text
     assert "python -m switchboard --version" not in text
     assert "python3.12 -m agent_comm --version" not in text
     assert "python scripts/build_codex_plugin.py" in text
-    assert "command -v switchboard >/dev/null && switchboard --version" in text
+    assert "command -v switchboard" not in text
+    assert "\nswitchboard --version" not in text
     assert "BUS_DIR=$(mktemp -d)" in text
     assert "chmod 700 \"$BUS_DIR\"" in text
     assert "BUS=\"$BUS_DIR/bus.sqlite\"" in text
@@ -64,21 +67,21 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
         "MSG_PLANNER_TO_IMPLEMENTER=\"<paste MSG_PLANNER_TO_IMPLEMENTER printed by planner>\"",
         "MSG_IMPLEMENTER_TO_PLANNER=\"<paste MSG_IMPLEMENTER_TO_PLANNER printed by implementer>\"",
         "replace pasted bus and planner values before running",
-        "replace pasted bus, planner, and implementer values before running",
-        'switchboard --bus "$BUS" next --as implementer-feature-a',
-        'switchboard --bus "$BUS" inbox --as planner-main',
+        "replace pasted bus and implementer values before running",
+        'python3.12 -m switchboard --bus "$BUS" next --as implementer-feature-a',
+        'python3.12 -m switchboard --bus "$BUS" inbox --as planner-main',
     )
     for snippet in required_snippets:
         assert snippet in text
 
     compact = " ".join(text.replace("\\\n", " ").split())
     assert (
-        'switchboard --bus "$BUS" send --as planner-main --to implementer-feature-a '
-        '--title "Fresh session smoke"'
+        'python3.12 -m switchboard --bus "$BUS" send --as planner-main '
+        '--to implementer-feature-a --title "Fresh session smoke"'
     ) in compact
     assert (
-        'switchboard --bus "$BUS" reply "$MSG_PLANNER_TO_IMPLEMENTER" '
-        '--as implementer-feature-a'
+        'python3.12 -m switchboard --bus "$BUS" reply '
+        '"$MSG_PLANNER_TO_IMPLEMENTER" --as implementer-feature-a'
     ) in compact
 
     forbidden_snippets = (
@@ -98,6 +101,9 @@ def test_fresh_agent_smoke_guide_exercises_mailbox_handoff_flow():
         assert snippet not in text
 
     assert 'switchboard --bus "$BUS" post' not in text
+    assert "replace pasted bus, planner, and implementer values before running" not in text
+    assert re.search(r"(?m)^(?!<installed plugin root>/scripts/)switchboard --bus", text) is None
+    assert "(switchboard --bus" not in text
 
 
 def test_fresh_agent_smoke_flow_commands_round_trip(tmp_path):
