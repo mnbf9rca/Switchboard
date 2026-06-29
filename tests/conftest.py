@@ -7,10 +7,19 @@ from pathlib import Path
 
 import pytest
 
+from agent_comm.db import initialize_bus
+
 
 @pytest.fixture
 def temp_bus(tmp_path: Path) -> Path:
     return tmp_path / "bus.sqlite"
+
+
+@pytest.fixture
+def bus(temp_bus: Path) -> Path:
+    with initialize_bus(temp_bus, "demo"):
+        pass
+    return temp_bus
 
 
 @pytest.fixture
