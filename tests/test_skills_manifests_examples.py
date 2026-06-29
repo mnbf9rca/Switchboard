@@ -208,6 +208,7 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
         "version": "0.2.0",
         "description": "A local mailbox for deliberate agent coordination",
         "author": {"name": "mnbf9rca"},
+        "license": "MIT",
         "keywords": [
             "agent-coordination",
             "agent-skills",
@@ -223,6 +224,7 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
     assert codex["name"] == claude_expected["name"]
     assert codex["version"] == claude_expected["version"]
     assert codex["description"] == claude_expected["description"]
+    assert codex["license"] == claude_expected["license"]
     assert codex["skills"] == claude_expected["skills"]
     assert codex["keywords"] == claude_expected["keywords"]
     assert isinstance(codex["author"], dict)

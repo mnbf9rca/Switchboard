@@ -5,6 +5,7 @@ description = "A local mailbox for deliberate agent coordination"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+license = "MIT"
 
 [project.scripts]
 switchboard = "switchboard.cli:main"
