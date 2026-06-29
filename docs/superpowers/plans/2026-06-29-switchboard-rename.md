@@ -31,6 +31,8 @@ Do not add compatibility aliases for the old CLI, module, plugin name, marketpla
 
 Historical plans/specs under `docs/superpowers/` may keep old names because they document how the project evolved. Active user-facing docs, tests, examples, manifests, scripts, package files, and skills must use Switchboard naming.
 
+The untracked workspace file `handover.md` is out of scope for this rename plan unless the user explicitly asks to track it. If it later becomes active tracked documentation, either move it under `docs/superpowers/` as historical material or rename its active content to Switchboard.
+
 ## File Structure
 
 - Rename directory `agent_comm/` to `switchboard/`.
@@ -40,8 +42,9 @@ Historical plans/specs under `docs/superpowers/` may keep old names because they
   - `skills/coordinate-as-planner/references/agent-communication-protocol.md` -> `skills/coordinate-as-planner/references/switchboard-protocol.md`
   - `skills/coordinate-as-implementer/references/agent-communication-protocol.md` -> `skills/coordinate-as-implementer/references/switchboard-protocol.md`
 - Modify package metadata: `pyproject.toml`, `uv.lock`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, `.agents/plugins/marketplace.json`.
+- Modify ignore rules: `.gitignore`.
 - Modify active docs: `README.md`, `docs/smoke-tests/fresh-agent-sessions.md`, `examples/*.md`, skill `SKILL.md` files, protocol references.
-- Modify tests and helpers: `tests/conftest.py`, package/CLI tests, path tests, docs smoke tests, plugin/skill manifest tests, import paths across all tests.
+- Modify tests and helpers: `tests/conftest.py`, `tests/test_ci_precommit_config.py`, package/CLI tests, path tests, docs smoke tests, plugin/skill manifest tests, import paths across all tests.
 
 ## Task 1: Rename Contract Tests
 
@@ -173,6 +176,8 @@ output = tmp_path / "switchboard"
 assert manifest["version"] == "0.2.0+codex.test-123"
 expected_files = [
     ".codex-plugin/plugin.json",
+    ".generated.json",
+    "README.md",
     "switchboard/__main__.py",
     "switchboard/cli.py",
     "scripts/switchboard",
@@ -393,12 +398,14 @@ Replace:
 
 ```gitignore
 .agent-comm/
+plugins/agents-together/
 ```
 
 with:
 
 ```gitignore
 .switchboard/
+plugins/switchboard/
 ```
 
 Keep:
@@ -470,6 +477,7 @@ git commit -m "Rename package and CLI to Switchboard"
 - Modify: `skills/coordinate-as-implementer/SKILL.md`
 - Rename: protocol reference files to `switchboard-protocol.md`
 - Modify: `scripts/validate_skill_protocols.py`
+- Modify: `tests/test_ci_precommit_config.py`
 - Modify: `tests/test_skills_manifests_examples.py`
 
 - [ ] **Step 1: Update plugin manifests**
@@ -591,11 +599,13 @@ switchboard wait --as <agent-id>
 switchboard wait --as <agent-id> --follow
 ```
 
-- [ ] **Step 6: Update protocol validator**
+- [ ] **Step 6: Update protocol validator and CI/precommit checks**
 
 In `scripts/validate_skill_protocols.py`, update expected filenames from `agent-communication-protocol.md` to `switchboard-protocol.md`.
 
 Keep the byte-identical requirement for the two protocol files.
+
+In `tests/test_ci_precommit_config.py`, update every expected protocol validation command/path from `agent-communication-protocol.md` to `switchboard-protocol.md`. This is required, not optional, because CI and precommit must enforce the same byte-identical protocol files as the local validator.
 
 - [ ] **Step 7: Update plugin bundle builder**
 
@@ -645,7 +655,7 @@ Plugin validation passed
 Run:
 
 ```bash
-git add .codex-plugin/plugin.json .claude-plugin/plugin.json .agents/plugins/marketplace.json scripts/build_codex_plugin.py scripts/validate_skill_protocols.py skills tests/test_skills_manifests_examples.py
+git add .codex-plugin/plugin.json .claude-plugin/plugin.json .agents/plugins/marketplace.json scripts/build_codex_plugin.py scripts/validate_skill_protocols.py skills tests/test_ci_precommit_config.py tests/test_skills_manifests_examples.py
 git add -u skills/coordinate-as-planner/references/agent-communication-protocol.md skills/coordinate-as-implementer/references/agent-communication-protocol.md
 git commit -m "Rename plugin and skills to Switchboard"
 ```
@@ -737,6 +747,8 @@ In `docs/smoke-tests/fresh-agent-sessions.md`, replace active names:
 - `plugins/agents-together` -> `plugins/switchboard`
 - `.agent-comm` -> `.switchboard`
 
+Do not mechanically rewrite absolute checkout paths to `/Users/rob/Downloads/git/switchboard`. Replace hard-coded local paths such as `/Users/rob/Downloads/git/agents-together` with `<repo root>` so the smoke guide remains valid even before the repository directory itself is renamed.
+
 - [ ] **Step 3: Update examples**
 
 In every file under `examples/`, replace active names:
@@ -792,7 +804,7 @@ Run:
 
 ```bash
 rg -n "agents-together|Agents Together|agent-comm|agent_comm|\\.agent-comm|AGENT_COMM_BUS|plugins/agents-together|agent-communication-protocol" \
-  README.md pyproject.toml .codex-plugin .claude-plugin .agents scripts switchboard skills examples docs/smoke-tests tests
+  README.md pyproject.toml .gitignore .codex-plugin .claude-plugin .agents scripts switchboard skills examples docs/smoke-tests tests
 ```
 
 Expected: no matches except negative assertions in tests that intentionally forbid old names.
