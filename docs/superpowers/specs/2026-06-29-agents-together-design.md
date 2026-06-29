@@ -107,7 +107,7 @@ description: Coordinate as the implementation agent using agent-comm. Use when r
 ---
 ```
 
-The shared protocol reference is duplicated under each skill's `references/` directory so each skill remains self-contained across harnesses.
+The shared protocol reference is duplicated under each skill's `references/` directory so each skill remains self-contained across harnesses. The duplicated protocol files must remain byte-identical. A single validation path must enforce this in pytest and be usable from CI and pre-commit, so local hooks and CI do not drift.
 
 Codex and Claude adapter manifests:
 
@@ -419,6 +419,7 @@ CLI tests use temporary bus paths and do not touch the user's home directory. Th
 - `wait --follow` reporting without auto-ack.
 - Artifact linking.
 - Status and Markdown export, including redacted export.
+- Skill protocol reference files are byte-identical across duplicated skill directories, using the same validation exercised by CI and pre-commit.
 
 Fresh-agent smoke testing should prove only the essential workflow:
 

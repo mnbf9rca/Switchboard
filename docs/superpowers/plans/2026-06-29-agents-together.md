@@ -42,6 +42,10 @@ Do not add:
 - Create `tests/test_repository.py`: repository-level mailbox behavior.
 - Create `tests/test_cli_mailbox.py`: command-level init/register/thread/post/inbox/show/ack/wait/artifact behavior.
 - Create `tests/test_backup_doctor_export.py`: backup, restore, doctor, status, export.
+- Create `tests/test_ci_precommit_config.py`: CI and pre-commit validation wiring.
+- Create `scripts/validate_skill_protocols.py`: byte-identical protocol reference validation shared by pytest, CI, and pre-commit.
+- Create `.github/workflows/ci.yml`: CI workflow for tests and protocol validation.
+- Create `.pre-commit-config.yaml`: local hook for protocol validation.
 - Create `skills/coordinate-as-planner/SKILL.md` and `skills/coordinate-as-planner/references/agent-communication-protocol.md`.
 - Create `skills/coordinate-as-implementer/SKILL.md` and `skills/coordinate-as-implementer/references/agent-communication-protocol.md`.
 - Create `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json`.
@@ -598,6 +602,7 @@ Expected: PASS.
 - Create: `examples/ready-for-review.md`
 - Create: `examples/review-findings.md`
 - Create: `tests/test_skills_manifests_examples.py`
+- Create: `scripts/validate_skill_protocols.py`
 
 - [ ] **Step 1: RED - skill and manifest contract**
 
@@ -608,8 +613,11 @@ each SKILL.md has YAML frontmatter with required name and description
 frontmatter name matches parent directory
 descriptions are trigger-rich
 each skill has its own duplicated references/agent-communication-protocol.md
+duplicated protocol reference files are byte-identical
 both plugin manifests contain name/version/description/skills exactly enough to expose ./skills/
 ```
+
+The byte-identical protocol assertion must call the same validator used by CI and pre-commit. Do not implement a second comparison path inside the test.
 
 Run: `uv run pytest tests/test_skills_manifests_examples.py -v`
 
@@ -656,7 +664,53 @@ Run: `uv run pytest tests/test_skills_manifests_examples.py -v`
 
 Expected: PASS.
 
-## Task 9: Smoke Docs
+## Task 9: CI and Pre-commit Validation
+
+**Files:**
+
+- Create: `.github/workflows/ci.yml`
+- Create: `.pre-commit-config.yaml`
+- Create: `tests/test_ci_precommit_config.py`
+- Modify: `README.md`
+
+- [ ] **Step 1: RED - CI and pre-commit share protocol validation**
+
+Write tests that assert:
+
+```text
+.github/workflows/ci.yml runs uv run pytest
+.github/workflows/ci.yml runs uv run python scripts/validate_skill_protocols.py
+.pre-commit-config.yaml contains a local hook that runs python scripts/validate_skill_protocols.py
+README.md documents uv run python scripts/validate_skill_protocols.py
+```
+
+Run: `uv run pytest tests/test_ci_precommit_config.py -v`
+
+Expected: FAIL until CI and pre-commit config exists.
+
+- [ ] **Step 2: GREEN - one byte-level validator**
+
+Create `scripts/validate_skill_protocols.py` so it:
+
+- Finds every `skills/*/references/agent-communication-protocol.md`.
+- Fails if fewer than two protocol files exist.
+- Reads each protocol file as bytes.
+- Compares every file byte-for-byte to the first sorted path.
+- Prints compared paths on success.
+- Exits nonzero and prints differing paths on mismatch.
+
+Wire `tests/test_skills_manifests_examples.py`, `.github/workflows/ci.yml`, and `.pre-commit-config.yaml` to this script or its validation function. The goal is one validation implementation used by pytest, CI, and pre-commit.
+
+Run:
+
+```bash
+uv run python scripts/validate_skill_protocols.py
+uv run pytest tests/test_skills_manifests_examples.py tests/test_ci_precommit_config.py -v
+```
+
+Expected: PASS.
+
+## Task 10: Smoke Docs
 
 **Files:**
 
@@ -691,7 +745,7 @@ Run: `uv run pytest tests/test_docs_smoke.py -v`
 
 Expected: PASS.
 
-## Task 10: Final Verification
+## Task 11: Final Verification
 
 **Files:**
 
@@ -702,7 +756,7 @@ Expected: PASS.
 Run:
 
 ```bash
-uv run pytest tests/test_package_cli.py tests/test_paths.py tests/test_db_schema.py tests/test_repository.py tests/test_cli_mailbox.py tests/test_backup_doctor_export.py tests/test_skills_manifests_examples.py tests/test_docs_smoke.py -v
+uv run pytest tests/test_package_cli.py tests/test_paths.py tests/test_db_schema.py tests/test_repository.py tests/test_cli_mailbox.py tests/test_backup_doctor_export.py tests/test_skills_manifests_examples.py tests/test_ci_precommit_config.py tests/test_docs_smoke.py -v
 ```
 
 Expected: PASS.
@@ -724,9 +778,10 @@ Run:
 ```bash
 uv run agent-comm --version
 python -m agent_comm --version
+uv run python scripts/validate_skill_protocols.py
 ```
 
-Expected: both print `agent-comm 0.1.0`. If `agent-comm` is installed in the active environment, also run `agent-comm --version`.
+Expected: version commands print `agent-comm 0.1.0`, and protocol validation exits 0. If `agent-comm` is installed in the active environment, also run `agent-comm --version`.
 
 - [ ] **Step 4: Verify no stale workflow concepts**
 
