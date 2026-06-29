@@ -405,7 +405,7 @@ def test_artifact_add_links_thread_and_optional_message(run_cli, temp_bus, tmp_p
 def test_mailbox_commands_do_not_create_missing_bus(run_cli, tmp_path):
     missing_bus = tmp_path / "missing.sqlite"
 
-    result = run_cli("--bus", str(missing_bus), "inbox", "--agent", "implementer")
+    result = run_cli("--bus", str(missing_bus), "show", "msg_missing")
 
     assert result.returncode != 0
     assert "does not exist" in result.stderr
@@ -653,6 +653,329 @@ def test_send_preserves_existing_agent_metadata(run_cli, temp_bus):
     assert planner["role"] == "lead"
     assert "agent_created: planner-main" not in result.stdout
     assert "agent_created: implementer-feature-a" in result.stdout
+
+
+def test_reply_uses_original_thread_recipient_and_auto_acks(run_cli, temp_bus):
+    original = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "Please review",
+        "Can you review this?",
+    )
+    assert original.returncode == 0, original.stderr
+    thread_id = _field(original.stdout, "thread")
+    original_id = _field(original.stdout, "message")
+
+    reply = run_cli(
+        "--bus",
+        str(temp_bus),
+        "reply",
+        original_id,
+        "--as",
+        "implementer-feature-a",
+        "Reviewed and ready.",
+    )
+
+    assert reply.returncode == 0, reply.stderr
+    reply_id = _field(reply.stdout, "message")
+    assert _field(reply.stdout, "thread") == thread_id
+    assert f"acked: {original_id}" in reply.stdout
+
+    reply_row = _row(temp_bus, "messages", reply_id)
+    assert reply_row["thread_id"] == thread_id
+    assert reply_row["from_agent"] == "implementer-feature-a"
+    assert reply_row["to_agent"] == "planner-main"
+    assert reply_row["subject"] == "Re: Please review"
+    assert reply_row["body_md"] == "Reviewed and ready."
+    assert _acked_at(temp_bus, original_id) is not None
+
+    with sqlite3.connect(temp_bus) as db:
+        links = db.execute(
+            "select message_id, reply_to_message_id from message_replies"
+        ).fetchall()
+    assert links == [(reply_id, original_id)]
+
+
+def test_reply_rejects_to_override(run_cli, temp_bus):
+    original = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "No override",
+        "Original body.",
+    )
+    assert original.returncode == 0, original.stderr
+    original_id = _field(original.stdout, "message")
+
+    reply = run_cli(
+        "--bus",
+        str(temp_bus),
+        "reply",
+        original_id,
+        "--as",
+        "implementer-feature-a",
+        "--to",
+        "someone-else",
+        "Body.",
+    )
+
+    assert reply.returncode != 0
+    assert "--to" in reply.stderr
+    assert _count_rows(temp_bus, "messages") == 1
+    assert _acked_at(temp_bus, original_id) is None
+
+
+def test_reply_rejects_non_recipient_agent(run_cli, temp_bus):
+    original = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "Recipient only",
+        "Original body.",
+    )
+    assert original.returncode == 0, original.stderr
+    original_id = _field(original.stdout, "message")
+
+    reply = run_cli(
+        "--bus",
+        str(temp_bus),
+        "reply",
+        original_id,
+        "--as",
+        "planner-main",
+        "Body.",
+    )
+
+    assert reply.returncode != 0
+    assert "recipient" in reply.stderr
+    assert _count_rows(temp_bus, "messages") == 1
+    assert _acked_at(temp_bus, original_id) is None
+
+
+def test_next_shows_body_without_ack_and_ack_is_explicit(run_cli, temp_bus):
+    send = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "Next",
+        "Body visible in next.\n",
+    )
+    assert send.returncode == 0, send.stderr
+    message_id = _field(send.stdout, "message")
+
+    next_result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "next",
+        "--as",
+        "implementer-feature-a",
+    )
+    assert next_result.returncode == 0, next_result.stderr
+    assert message_id in next_result.stdout
+    assert "Body visible in next.\n" in next_result.stdout
+    assert _acked_at(temp_bus, message_id) is None
+
+    ack = run_cli(
+        "--bus",
+        str(temp_bus),
+        "ack",
+        message_id,
+        "--as",
+        "implementer-feature-a",
+    )
+    assert ack.returncode == 0, ack.stderr
+    assert _acked_at(temp_bus, message_id) is not None
+
+    empty_next = run_cli(
+        "--bus",
+        str(temp_bus),
+        "next",
+        "--as",
+        "implementer-feature-a",
+    )
+    assert empty_next.returncode == 0, empty_next.stderr
+    assert empty_next.stdout == ""
+
+
+def test_inbox_and_wait_accept_as_alias(run_cli, temp_bus):
+    send = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "Alias",
+        "Alias body.",
+    )
+    assert send.returncode == 0, send.stderr
+    message_id = _field(send.stdout, "message")
+
+    inbox = run_cli(
+        "--bus",
+        str(temp_bus),
+        "inbox",
+        "--as",
+        "implementer-feature-a",
+    )
+    assert inbox.returncode == 0, inbox.stderr
+    assert message_id in inbox.stdout
+
+    wait = run_cli(
+        "--bus",
+        str(temp_bus),
+        "wait",
+        "--as",
+        "implementer-feature-a",
+        "--timeout",
+        "0",
+    )
+    assert wait.returncode == 0, wait.stderr
+    assert message_id in wait.stdout
+    assert _acked_at(temp_bus, message_id) is None
+
+
+def test_high_level_read_commands_auto_initialize_empty_bus(run_cli, tmp_path):
+    missing_bus = tmp_path / "empty.sqlite"
+
+    inbox = run_cli("--bus", str(missing_bus), "inbox", "--as", "implementer")
+    assert inbox.returncode == 0, inbox.stderr
+    assert inbox.stdout == ""
+    assert missing_bus.exists()
+
+    next_result = run_cli("--bus", str(missing_bus), "next", "--as", "implementer")
+    assert next_result.returncode == 0, next_result.stderr
+    assert next_result.stdout == ""
+
+    wait = run_cli(
+        "--bus",
+        str(missing_bus),
+        "wait",
+        "--as",
+        "implementer",
+        "--timeout",
+        "0",
+    )
+    assert wait.returncode != 0
+    assert "timed out" in wait.stderr
+    assert "does not exist" not in wait.stderr
+
+    ack = run_cli(
+        "--bus",
+        str(missing_bus),
+        "ack",
+        "--as",
+        "implementer",
+        "msg_missing",
+    )
+    assert ack.returncode != 0
+    assert "record not found" in ack.stderr
+    assert "does not exist" not in ack.stderr
+
+
+def test_send_and_next_share_default_bus_across_worktrees(
+    make_git_repo, tmp_path, monkeypatch, cli_env
+):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    repo_a = make_git_repo("repo-a", origin="git@github.com:Example/Repo.git")
+    repo_b = make_git_repo("repo-b", origin="https://github.com/example/repo.git")
+    script = _agent_comm_script(Path(sys.executable))
+    env = {**cli_env, "HOME": str(tmp_path / "home")}
+
+    send = subprocess.run(
+        [
+            str(script),
+            "send",
+            "--as",
+            "planner-main",
+            "--to",
+            "implementer-feature-a",
+            "Default bus shared message.",
+        ],
+        cwd=repo_a,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert send.returncode == 0, send.stderr
+    message_id = _field(send.stdout, "message")
+
+    next_result = subprocess.run(
+        [
+            str(script),
+            "next",
+            "--as",
+            "implementer-feature-a",
+        ],
+        cwd=repo_b,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert next_result.returncode == 0, next_result.stderr
+    assert message_id in next_result.stdout
+    assert "Default bus shared message." in next_result.stdout
+    assert resolve_bus_path(None, None, repo_a) == resolve_bus_path(None, None, repo_b)
+
+
+def test_send_wait_ignores_unrelated_existing_inbox_message(run_cli, temp_bus):
+    unrelated = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "other-agent",
+        "--to",
+        "planner-main",
+        "--title",
+        "Existing unrelated",
+        "Do not satisfy send wait.",
+    )
+    assert unrelated.returncode == 0, unrelated.stderr
+    unrelated_id = _field(unrelated.stdout, "message")
+
+    waiting = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--wait",
+        "--timeout",
+        "0",
+        "Please reply to this message.",
+    )
+
+    assert waiting.returncode != 0
+    assert "timed out waiting for reply" in waiting.stderr
+    assert unrelated_id not in waiting.stdout
 
 
 def _field(output: str, name: str) -> str:

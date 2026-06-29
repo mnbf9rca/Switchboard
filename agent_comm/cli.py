@@ -27,6 +27,8 @@ COMMANDS = (
     "post",
     "inbox",
     "show",
+    "reply",
+    "next",
     "ack",
     "wait",
     "artifact",
@@ -97,17 +99,33 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.add_argument("--reply-to", action="append", default=[])
             subparser.set_defaults(handler=_handle_post)
         elif command == "inbox":
-            subparser.add_argument("--agent", required=True)
+            subparser.add_argument("--agent", dest="agent")
+            subparser.add_argument("--as", dest="as_agent")
             subparser.set_defaults(handler=_handle_inbox)
         elif command == "show":
             subparser.add_argument("message")
             subparser.set_defaults(handler=_handle_show)
+        elif command == "reply":
+            subparser.add_argument("message_id")
+            subparser.add_argument("--as", dest="as_agent", required=True)
+            subparser.add_argument("--artifact", action="append", default=[])
+            subparser.add_argument("--body-file")
+            subparser.add_argument("--stdin", action="store_true")
+            subparser.add_argument("--wait", action="store_true")
+            subparser.add_argument("--timeout", type=float, help=argparse.SUPPRESS)
+            subparser.add_argument("message", nargs="*")
+            subparser.set_defaults(handler=_handle_reply)
+        elif command == "next":
+            subparser.add_argument("--as", dest="as_agent", required=True)
+            subparser.set_defaults(handler=_handle_next)
         elif command == "ack":
             subparser.add_argument("message")
-            subparser.add_argument("--agent", required=True)
+            subparser.add_argument("--agent", dest="agent")
+            subparser.add_argument("--as", dest="as_agent")
             subparser.set_defaults(handler=_handle_ack)
         elif command == "wait":
-            subparser.add_argument("--agent", required=True)
+            subparser.add_argument("--agent", dest="agent")
+            subparser.add_argument("--as", dest="as_agent")
             subparser.add_argument("-f", "--follow", action="store_true")
             subparser.add_argument("--timeout", type=float, help=argparse.SUPPRESS)
             subparser.set_defaults(handler=_handle_wait)
@@ -286,7 +304,7 @@ def _derive_title(body: str) -> str:
 
 def _handle_inbox(args: argparse.Namespace) -> int:
     try:
-        messages = _repo(args).inbox(args.agent)
+        messages = _repo_create(args).inbox(_agent_arg(args))
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     _print_messages(messages, include_body=False)
@@ -307,7 +325,7 @@ def _handle_show(args: argparse.Namespace) -> int:
 
 def _handle_ack(args: argparse.Namespace) -> int:
     try:
-        message = _repo(args).ack_message(args.message, args.agent)
+        message = _repo_create(args).ack_message(args.message, _agent_arg(args))
     except _CLI_ERRORS as exc:
         return _print_error(exc)
     print(f"message: {message.id}")
@@ -320,10 +338,10 @@ def _handle_wait(args: argparse.Namespace) -> int:
         print("ERROR: --timeout must be non-negative", file=sys.stderr)
         return 1
     try:
-        repo = _repo(args)
+        repo = _repo_create(args)
         messages = _wait_for_messages(
             repo,
-            args.agent,
+            _agent_arg(args),
             timeout=args.timeout,
             follow=args.follow,
         )
@@ -335,6 +353,55 @@ def _handle_wait(args: argparse.Namespace) -> int:
         print("ERROR: timed out waiting for messages", file=sys.stderr)
         return 1
     _print_messages(messages, include_body=False)
+    return 0
+
+
+def _handle_reply(args: argparse.Namespace) -> int:
+    try:
+        body = _read_body(args)
+        repo = _repo_create(args)
+        original = repo.get_message(args.message_id)
+        if original.to_agent != args.as_agent:
+            raise PermissionError("only the message recipient can reply")
+        _ensure_agent(repo, args.as_agent)
+        message = repo.post_message(
+            original.thread_id,
+            args.as_agent,
+            original.from_agent,
+            f"Re: {original.subject}",
+            body,
+            reply_to=[original.id],
+        )
+        acked = repo.ack_message(original.id, args.as_agent)
+        artifacts = _attach_artifacts(repo, original.thread_id, message.id, args.artifact)
+    except (OSError, UnicodeDecodeError) as exc:
+        return _print_error(exc)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+
+    _print_message(message, include_body=False)
+    print(f"acked: {acked.id}")
+    for artifact in artifacts:
+        _print_artifact(artifact)
+    if args.wait:
+        return _wait_for_reply_to_message(
+            repo,
+            waiting_agent=args.as_agent,
+            thread_id=message.thread_id,
+            after_seq=message.seq,
+            timeout=args.timeout,
+        )
+    return 0
+
+
+def _handle_next(args: argparse.Namespace) -> int:
+    try:
+        messages = _repo_create(args).inbox(args.as_agent)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+    if not messages:
+        return 0
+    _print_message(messages[0], include_body=True)
     return 0
 
 
@@ -414,6 +481,13 @@ def _repo_create(args: argparse.Namespace) -> Repository:
     with initialize_bus(path, project_id):
         pass
     return Repository(path)
+
+
+def _agent_arg(args: argparse.Namespace) -> str:
+    agent = getattr(args, "as_agent", None) or getattr(args, "agent", None)
+    if not agent:
+        raise ValueError("--as or --agent is required")
+    return agent
 
 
 def _bus_path(args: argparse.Namespace) -> Path:
