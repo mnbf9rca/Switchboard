@@ -17,8 +17,6 @@ build/
 dist/
 *.egg-info/
 
-plugins/switchboard/
-
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

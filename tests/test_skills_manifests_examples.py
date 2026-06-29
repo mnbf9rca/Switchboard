@@ -5,7 +5,6 @@ import os
 import re
 from pathlib import Path
 import subprocess
-import sys
 
 from conftest import OLD_ACTIVE_NAMES
 from scripts.validate_skill_protocols import validate_skill_protocols
@@ -209,6 +208,13 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
         "version": "0.2.0",
         "description": "A local mailbox for deliberate agent coordination",
         "author": {"name": "mnbf9rca"},
+        "keywords": [
+            "agent-coordination",
+            "agent-skills",
+            "sqlite",
+            "codex",
+            "claude",
+        ],
         "skills": "./skills/",
     }
     assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text()) == claude_expected
@@ -218,6 +224,7 @@ def test_plugin_manifests_expose_skills_as_harness_adapters():
     assert codex["version"] == claude_expected["version"]
     assert codex["description"] == claude_expected["description"]
     assert codex["skills"] == claude_expected["skills"]
+    assert codex["keywords"] == claude_expected["keywords"]
     assert isinstance(codex["author"], dict)
     assert codex["author"] == claude_expected["author"]
     assert isinstance(codex["interface"], dict)
@@ -248,7 +255,7 @@ def test_repo_local_codex_marketplace_exposes_plugin_root():
                 "name": "switchboard",
                 "source": {
                     "source": "local",
-                    "path": "./plugins/switchboard",
+                    "path": "./",
                 },
                 "policy": {
                     "installation": "AVAILABLE",
@@ -309,31 +316,10 @@ def test_plugin_launcher_rejects_python_bin_below_supported_version(tmp_path):
     assert "unsupported python should not run agent_comm" not in result.stderr
 
 
-def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
-    output = tmp_path / "switchboard"
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "scripts" / "build_codex_plugin.py"),
-            "--output",
-            str(output),
-            "--cachebuster",
-            "test-123",
-        ],
-        cwd=ROOT,
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    assert "Built Codex plugin" in result.stdout
-    manifest = json.loads((output / ".codex-plugin" / "plugin.json").read_text())
-    assert manifest["version"] == "0.2.0+codex.test-123"
-
+def test_repo_root_is_the_plugin_source_tree():
     expected_files = [
         ".codex-plugin/plugin.json",
-        ".generated.json",
+        ".claude-plugin/plugin.json",
         "README.md",
         "switchboard/__main__.py",
         "switchboard/cli.py",
@@ -344,25 +330,20 @@ def test_codex_plugin_bundle_builds_from_single_source_tree(tmp_path):
         "skills/coordinate-as-implementer/references/switchboard-protocol.md",
     ]
     for relative_path in expected_files:
-        assert (output / relative_path).is_file()
+        assert (ROOT / relative_path).is_file()
 
     for forbidden in (
-        ".git",
-        ".venv",
-        ".pytest_cache",
-        "dist",
-        "tests",
-        "handover.md",
-        "plugins",
-        "uv.lock",
+        "scripts/build_codex_plugin.py",
+        "scripts/build_plugin_bundle.py",
+        "plugins/switchboard/.generated.json",
     ):
-        assert not (output / forbidden).exists()
+        assert not (ROOT / forbidden).exists()
 
-    launcher = output / "scripts" / "switchboard"
+    launcher = ROOT / "scripts" / "switchboard"
     assert os.access(launcher, os.X_OK)
     version = subprocess.run(
         [str(launcher), "--version"],
-        cwd=tmp_path,
+        cwd=ROOT,
         check=True,
         text=True,
         stdout=subprocess.PIPE,

@@ -46,7 +46,8 @@ def test_fresh_agent_smoke_guide_documents_runtime_commands():
     assert "uv run --python 3.12 python -m switchboard" in text
     assert "python -m switchboard --version" not in text
     assert "python3.12 -m agent_comm --version" not in text
-    assert "python scripts/build_codex_plugin.py" in text
+    assert "python scripts/build_codex_plugin.py" not in text
+    assert "plugin source points at this repository root" in text
     assert "command -v switchboard" not in text
     assert "\nswitchboard --version" not in text
     assert "BUS_DIR=$(mktemp -d)" in text

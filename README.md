@@ -1,19 +1,22 @@
 # Switchboard
 
-Switchboard is a local mailbox for deliberate coordination between independent
-coding agents working in separate sessions, worktrees, or harnesses.
+Switchboard is a local mailbox for coding agents that need to work together
+without sharing one chat session. It is built for running agents side by side:
+for example, a Claude session planning or reviewing work while a Codex session
+implements it, or two agents in separate worktrees coordinating a handoff.
 
-It is intentionally small. Switchboard stores addressed messages, replies,
-acknowledgements, and artifact links through SQLite. Plans, review notes, logs,
-large context, and project decisions stay in normal project files, where the
-repository can review and version them.
+The mailbox is deliberately narrow. Agents send addressed messages, replies,
+acknowledgements, and links to project artifacts through a shared SQLite file.
+The actual plan, review notes, logs, and larger context stay in normal project
+files where they can be edited, reviewed, and versioned.
 
 ## What It Is
 
-- A local CLI for sending explicit handoffs between agents.
-- A durable SQLite mailbox for addressed messages and replies.
-- A lightweight way to link project artifacts from mailbox messages.
-- A coordination tool for humans and agents sharing one project.
+- A local CLI for explicit agent-to-agent handoffs.
+- A durable SQLite mailbox shared by agents working on the same project.
+- A small protocol for questions, replies, acknowledgements, and review
+  handoffs.
+- Plugin manifests and Agent Skills for Claude and Codex-style harnesses.
 
 ## What It Is Not
 
@@ -25,25 +28,25 @@ repository can review and version them.
 
 ## Quick Start
 
-Send a handoff:
+Planner sends a handoff:
 
 ```sh
 switchboard send --as planner-main --to implementer-feature-a --title "Review plan" "Please review the plan and reply with blockers."
 ```
 
-Read the next addressed message:
+Implementer reads the next addressed message:
 
 ```sh
 switchboard next --as implementer-feature-a
 ```
 
-Reply to a message:
+Implementer replies:
 
 ```sh
 switchboard reply <message-id> --as implementer-feature-a "No blockers."
 ```
 
-Check an inbox:
+Planner checks for the reply:
 
 ```sh
 switchboard inbox --as planner-main
@@ -78,3 +81,9 @@ uv run --python 3.12 switchboard --help
 ## Smoke Test
 
 See the [fresh-agent smoke test guide](docs/smoke-tests/fresh-agent-sessions.md).
+
+## Agent Guidance
+
+See [AGENTS.md](AGENTS.md) for the canonical external specifications and project
+principles used when changing skills, manifests, marketplaces, or coordination
+behavior.

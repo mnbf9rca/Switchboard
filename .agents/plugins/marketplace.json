@@ -8,7 +8,7 @@
       "name": "switchboard",
       "source": {
         "source": "local",
-        "path": "./plugins/switchboard"
+        "path": "./"
       },
       "policy": {
         "installation": "AVAILABLE",

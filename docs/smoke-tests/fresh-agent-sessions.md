@@ -14,7 +14,6 @@ chmod 700 "$BUS_DIR"
 BUS="$BUS_DIR/bus.sqlite"
 cd "$ROOT"
 
-python scripts/build_codex_plugin.py
 python3.12 -m switchboard --version
 
 printf 'BUS=%s\n' "$BUS"
@@ -34,9 +33,8 @@ In Codex, use `/plugins`, add that marketplace source, then install
 session after installing so the skills are loaded.
 
 The marketplace file lives at `.agents/plugins/marketplace.json`, and its
-plugin source points at the generated `plugins/switchboard` bundle. Re-run
-`python scripts/build_codex_plugin.py` and reinstall the plugin after source
-changes so Codex picks up a new cachebusted plugin version.
+plugin source points at this repository root. Reinstall or update the plugin
+after source changes so Codex picks up the current files.
 
 Expose the local Claude plugin from:
 

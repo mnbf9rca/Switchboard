@@ -5,6 +5,13 @@
   "author": {
     "name": "mnbf9rca"
   },
+  "keywords": [
+    "agent-coordination",
+    "agent-skills",
+    "sqlite",
+    "codex",
+    "claude"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Switchboard",
