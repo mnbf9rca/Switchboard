@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from conftest import _agent_comm_script
+from agent_comm.paths import resolve_bus_path
 
 
 def test_register_start_thread_and_post_round_trip(run_cli, temp_bus, tmp_path):
@@ -411,6 +412,212 @@ def test_mailbox_commands_do_not_create_missing_bus(run_cli, tmp_path):
     assert not missing_bus.exists()
 
 
+def test_send_inline_auto_initializes_registers_and_posts(run_cli, temp_bus):
+    result = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--title",
+        "Coordination test",
+        "Please acknowledge this test.",
+    )
+
+    assert result.returncode == 0, result.stderr
+    thread_id = _field(result.stdout, "thread")
+    message_id = _field(result.stdout, "message")
+
+    thread = _row(temp_bus, "threads", thread_id)
+    message = _row(temp_bus, "messages", message_id)
+
+    assert thread["title"] == "Coordination test"
+    assert message["thread_id"] == thread_id
+    assert message["from_agent"] == "planner-main"
+    assert message["to_agent"] == "implementer-feature-a"
+    assert message["subject"] == "Coordination test"
+    assert message["body_md"] == "Please acknowledge this test."
+    assert message["acked_at"] is None
+    assert "agent_created: planner-main" in result.stdout
+    assert "agent_created: implementer-feature-a" in result.stdout
+
+    with sqlite3.connect(temp_bus) as db:
+        agents = {
+            row[0]
+            for row in db.execute("select id from agents order by id").fetchall()
+        }
+    assert agents == {"implementer-feature-a", "planner-main"}
+
+
+def test_send_requires_exactly_one_body_source(run_cli, temp_bus, tmp_path):
+    body_file = tmp_path / "body.md"
+    body_file.write_text("from file", encoding="utf-8")
+
+    missing = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+    )
+    assert missing.returncode != 0
+    assert "body source" in missing.stderr
+    assert not temp_bus.exists()
+
+    duplicate = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--body-file",
+        str(body_file),
+        "inline body",
+    )
+    assert duplicate.returncode != 0
+    assert "body source" in duplicate.stderr
+
+
+def test_send_supports_body_file_stdin_artifacts_and_in_thread(
+    run_cli, temp_bus, tmp_path, cli_env
+):
+    artifact_path = tmp_path / "plan.md"
+    artifact_path.write_text("# Plan\n", encoding="utf-8")
+    body_file = tmp_path / "body.md"
+    body_file.write_text("from file", encoding="utf-8")
+
+    first = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--body-file",
+        str(body_file),
+        "--artifact",
+        str(artifact_path),
+    )
+    assert first.returncode == 0, first.stderr
+    thread_id = _field(first.stdout, "thread")
+    first_message_id = _field(first.stdout, "message")
+
+    artifact = _row(temp_bus, "artifacts", _field(first.stdout, "artifact"))
+    assert artifact["thread_id"] == thread_id
+    assert artifact["message_id"] == first_message_id
+    assert artifact["path"] == str(artifact_path)
+
+    script = _agent_comm_script(Path(sys.executable))
+    second = subprocess.run(
+        [
+            str(script),
+            "--bus",
+            str(temp_bus),
+            "send",
+            "--as",
+            "planner-main",
+            "--to",
+            "implementer-feature-a",
+            "--in-thread",
+            thread_id,
+            "--stdin",
+        ],
+        cwd=tmp_path,
+        env=cli_env,
+        input="from stdin",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert second.returncode == 0, second.stderr
+    second_message_id = _field(second.stdout, "message")
+    assert _field(second.stdout, "thread") == thread_id
+    assert _row(temp_bus, "messages", second_message_id)["body_md"] == "from stdin"
+    assert _count_rows(temp_bus, "threads") == 1
+
+    missing_thread = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "--in-thread",
+        "thread_missing",
+        "body",
+    )
+    assert missing_thread.returncode != 0
+    assert "thread" in missing_thread.stderr.lower()
+
+
+def test_send_uses_derived_default_bus_without_project_or_bus(
+    make_git_repo, tmp_path, monkeypatch, cli_env
+):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    repo = make_git_repo("repo", origin="git@github.com:Example/Repo.git")
+    script = _agent_comm_script(Path(sys.executable))
+
+    result = subprocess.run(
+        [
+            str(script),
+            "send",
+            "--as",
+            "planner-main",
+            "--to",
+            "implementer-feature-a",
+            "Default bus message.",
+        ],
+        cwd=repo,
+        env={**cli_env, "HOME": str(tmp_path / "home")},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    bus_path = resolve_bus_path(None, None, repo)
+    assert bus_path.exists()
+    message_id = _field(result.stdout, "message")
+    assert _row(bus_path, "messages", message_id)["body_md"] == "Default bus message."
+
+
+def test_send_prints_agent_created_only_for_new_agents(run_cli, temp_bus):
+    first = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "First message.",
+    )
+    assert first.returncode == 0, first.stderr
+    assert "agent_created: planner-main" in first.stdout
+    assert "agent_created: implementer-feature-a" in first.stdout
+
+    second = run_cli(
+        "--bus",
+        str(temp_bus),
+        "send",
+        "--as",
+        "planner-main",
+        "--to",
+        "implementer-feature-a",
+        "Second message.",
+    )
+    assert second.returncode == 0, second.stderr
+    assert "agent_created:" not in second.stdout
+
+
 def _field(output: str, name: str) -> str:
     prefix = f"{name}: "
     for line in output.splitlines():
@@ -424,3 +631,20 @@ def _acked_at(bus_path: Path, message_id: str) -> str | None:
         return db.execute(
             "select acked_at from messages where id = ?", (message_id,)
         ).fetchone()[0]
+
+
+def _row(bus_path: Path, table: str, record_id: str) -> sqlite3.Row:
+    id_column = "id"
+    with sqlite3.connect(bus_path) as db:
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            f"select * from {table} where {id_column} = ?",
+            (record_id,),
+        ).fetchone()
+    assert row is not None
+    return row
+
+
+def _count_rows(bus_path: Path, table: str) -> int:
+    with sqlite3.connect(bus_path) as db:
+        return db.execute(f"select count(*) from {table}").fetchone()[0]

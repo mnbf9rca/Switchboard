@@ -21,6 +21,7 @@ COMMANDS = (
     "doctor",
     "backup",
     "restore",
+    "send",
     "register",
     "start-thread",
     "post",
@@ -63,6 +64,18 @@ def build_parser() -> argparse.ArgumentParser:
         elif command == "restore":
             subparser.add_argument("--from", dest="from_path", required=True)
             subparser.set_defaults(handler=_handle_restore)
+        elif command == "send":
+            subparser.add_argument("--as", dest="as_agent", required=True)
+            subparser.add_argument("--to", required=True)
+            subparser.add_argument("--title")
+            subparser.add_argument("--in-thread")
+            subparser.add_argument("--artifact", action="append", default=[])
+            subparser.add_argument("--body-file")
+            subparser.add_argument("--stdin", action="store_true")
+            subparser.add_argument("--wait", action="store_true")
+            subparser.add_argument("--timeout", type=float, help=argparse.SUPPRESS)
+            subparser.add_argument("message", nargs="*")
+            subparser.set_defaults(handler=_handle_send)
         elif command == "migrate":
             subparser.set_defaults(handler=_handle_migrate)
         elif command == "register":
@@ -220,6 +233,57 @@ def _handle_post(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_send(args: argparse.Namespace) -> int:
+    try:
+        body = _read_body(args)
+        repo = _repo_create(args)
+        created_agents = [
+            agent_id
+            for agent_id in (args.as_agent, args.to)
+            if _ensure_agent(repo, agent_id)
+        ]
+        if args.in_thread:
+            try:
+                thread = repo.get_thread(args.in_thread)
+            except ValueError as exc:
+                raise ValueError(f"thread not found: {args.in_thread}") from exc
+        else:
+            title = args.title or _derive_title(body)
+            thread = repo.start_thread(title, _bus_path(args).parent.name)
+        message = repo.post_message(
+            thread.id,
+            args.as_agent,
+            args.to,
+            args.title or thread.title,
+            body,
+        )
+        artifacts = _attach_artifacts(repo, thread.id, message.id, args.artifact)
+    except (OSError, UnicodeDecodeError) as exc:
+        return _print_error(exc)
+    except _CLI_ERRORS as exc:
+        return _print_error(exc)
+
+    _print_message(message, include_body=False)
+    for agent_id in created_agents:
+        print(f"agent_created: {agent_id}")
+    for artifact in artifacts:
+        _print_artifact(artifact)
+    if args.wait:
+        return _wait_for_reply_to_message(
+            repo,
+            waiting_agent=args.as_agent,
+            thread_id=message.thread_id,
+            after_seq=message.seq,
+            timeout=args.timeout,
+        )
+    return 0
+
+
+def _derive_title(body: str) -> str:
+    first_line = body.strip().splitlines()[0] if body.strip() else "Message"
+    return first_line[:80] or "Message"
+
+
 def _handle_inbox(args: argparse.Namespace) -> int:
     try:
         messages = _repo(args).inbox(args.agent)
@@ -344,8 +408,59 @@ def _repo(args: argparse.Namespace) -> Repository:
     return Repository(path)
 
 
+def _repo_create(args: argparse.Namespace) -> Repository:
+    path = _bus_path(args)
+    project_id = path.parent.name
+    with initialize_bus(path, project_id):
+        pass
+    return Repository(path)
+
+
 def _bus_path(args: argparse.Namespace) -> Path:
     return resolve_bus_path(args.bus, args.project, cwd=None)
+
+
+def _read_body(args: argparse.Namespace) -> str:
+    body_sources = (
+        int(bool(args.message))
+        + int(bool(args.body_file))
+        + int(bool(args.stdin))
+    )
+    if body_sources != 1:
+        raise ValueError("send/reply requires exactly one body source")
+    if args.body_file:
+        return Path(args.body_file).read_bytes().decode("utf-8")
+    if args.stdin:
+        return sys.stdin.read()
+    return " ".join(args.message)
+
+
+def _ensure_agent(repo: Repository, agent_id: str) -> bool:
+    try:
+        repo.get_agent(agent_id)
+        created = False
+    except ValueError:
+        created = True
+    repo.register_agent(agent_id)
+    return created
+
+
+def _attach_artifacts(
+    repo: Repository,
+    thread_id: str,
+    message_id: str,
+    paths: list[str],
+) -> list[Artifact]:
+    return [
+        repo.add_artifact(
+            thread_id,
+            message_id,
+            path,
+            None,
+            "linked artifact",
+        )
+        for path in paths
+    ]
 
 
 def _print_error(exc: BaseException) -> int:
@@ -380,6 +495,38 @@ def _wait_for_messages(
             printed_ids.update(message.id for message in new_messages)
         if deadline is not None and time.monotonic() >= deadline:
             return collected
+        sleep_for = POLL_INTERVAL_SECONDS
+        if deadline is not None:
+            sleep_for = min(
+                POLL_INTERVAL_SECONDS,
+                max(0.0, deadline - time.monotonic()),
+            )
+        time.sleep(sleep_for)
+
+
+def _wait_for_reply_to_message(
+    repo: Repository,
+    *,
+    waiting_agent: str,
+    thread_id: str,
+    after_seq: int,
+    timeout: float | None,
+) -> int:
+    print(f"waiting_for_reply_in_thread: {thread_id}")
+    print("interrupt: press Ctrl-C to stop waiting")
+    deadline = None if timeout is None else time.monotonic() + timeout
+    while True:
+        messages = [
+            message
+            for message in repo.inbox(waiting_agent)
+            if message.thread_id == thread_id and message.seq > after_seq
+        ]
+        if messages:
+            _print_messages(messages, include_body=False)
+            return 0
+        if deadline is not None and time.monotonic() >= deadline:
+            print("ERROR: timed out waiting for reply", file=sys.stderr)
+            return 1
         sleep_for = POLL_INTERVAL_SECONDS
         if deadline is not None:
             sleep_for = min(
